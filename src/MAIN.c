@@ -4,8 +4,8 @@
 #include "utils.h"
 
 // SPI Chip Select Pin (PA4)
-#define CS_PIN_HIGH()   (GPIOA->BSRR = BIT(4U))
-#define CS_PIN_LOW()    (GPIOA->BSRR = (BIT(4U) << 16U))
+#define CS_PIN_HIGH()   (GPIOA->BSRR = BIT_MASK(4U))
+#define CS_PIN_LOW()    (GPIOA->BSRR = (BIT_MASK(4U) << 16U))
 
 #define LSM6DSO_STABILIZATION_MS  (100U)
 #define LSM6DSO_RETRY_DELAY_MS    (10U)
@@ -391,14 +391,14 @@ void init_gpio(void)
                    GPIO_CRH_CNF12_1 | GPIO_CRH_CNF13_1 |
                    GPIO_CRH_CNF14_1 | GPIO_CRH_CNF15_1);
     
-    GPIOA->ODR &= ~(BIT(0U) | BIT(1U) | BIT(2U) | BIT(3U) | BIT(8U) | 
-                    BIT(11U) | BIT(12U) | BIT(13U) | BIT(14U) | BIT(15U));
+    GPIOA->ODR &= ~(BIT_MASK(0U) | BIT_MASK(1U) | BIT_MASK(2U) | BIT_MASK(3U) | BIT_MASK(8U) | 
+                    BIT_MASK(11U) | BIT_MASK(12U) | BIT_MASK(13U) | BIT_MASK(14U) | BIT_MASK(15U));
 
     
     // PA4 (CS): Output, 2 MHz speed, push-pull
     GPIOA->CRL &= ~(GPIO_CRL_MODE4 | GPIO_CRL_CNF4);
     GPIOA->CRL |= GPIO_CRL_MODE4_1;  // 2MHz output
-    GPIOA->ODR |= BIT(4U);  // Set CS high initially
+    GPIOA->ODR |= BIT_MASK(4U);  // Set CS high initially
 
     // PA5 (SCK): AF push-pull, 2MHz
     GPIOA->CRL &= ~(GPIO_CRL_MODE5 | GPIO_CRL_CNF5);
