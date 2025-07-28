@@ -1,5 +1,5 @@
 #include <stdio.h>
-// #include <stdbool.h>
+#include <stdbool.h>
 #include "stm32f10x.h"
 #include "utils.h"
 
@@ -28,7 +28,7 @@
 #define SHIFT_16_BITS             (16U)
 
 // Error Codes
-typedef enum 
+typedef enum
 {
     ERROR_NONE = 0,
     ERROR_SPI_TIMEOUT = -1,
@@ -38,7 +38,7 @@ typedef enum
 } ErrorCode_t;
 
 // FSM States
-typedef enum 
+typedef enum
 {
    STATE_INIT,        // Init hardware and gyroscope
    STATE_STABILIZING, // New state for non-blocking delay
@@ -49,7 +49,8 @@ typedef enum
    STATE_ERROR        // Error state for recovery or halt
 } State_t;
 
-typedef struct {
+typedef struct
+{
     volatile State_t current_state;
     volatile s16 gyro_x;
     volatile s16 gyro_y; 
@@ -60,7 +61,7 @@ typedef struct {
     volatile u32 system_tick;
 } SystemState_t;
 
-typedef struct 
+typedef struct
 {
     volatile char buffer[UART_TX_BUFFER_SIZE];
     volatile u16 write_idx;
@@ -75,30 +76,34 @@ static UartBuffer_t g_uart_tx = {{0}, 0U, 0U};
 static char g_format_buffer[FORMAT_BUFFER_SIZE];   // For snprintf operations
 static u8 g_spi_buffer[SPI_BURST_READ_LEN];        // For SPI burst reads
 
-// static ErrorCode_t read_gyro_data(void);
-// static void set_state(State_t new_state);static ErrorCode_t read_gyro_data(void);
-// static void set_state(State_t new_state);
-// static void handle_init_state(void);
-// static void handle_stabilizing_state(void);
-// static void handle_read_state(void);
-// static void handle_process_state(void);
-// static void handle_output_state(void);
-// static void handle_error_state(void);
-// static void clear_spi_rx_buffer(void);
-// static bool is_uart_enabled(void);
-// static bool is_timer_running(u32 timer_base);
+static ErrorCode_t read_gyro_data(void);
+static void set_state(State_t new_state);static ErrorCode_t read_gyro_data(void);
+static void set_state(State_t new_state);
+static void handle_init_state(void);
+static void handle_stabilizing_state(void);
+static void handle_read_state(void);
+static void handle_process_state(void);
+static void handle_output_state(void);
+static void handle_error_state(void);
+static void clear_spi_rx_buffer(void);
+static bool is_uart_enabled(void);
+static bool is_timer_running(u32 timer_base);
 
-void SysTick_Handler(void) 
+void SysTick_Handler(void)
 {
     g_system.system_tick++;
 }
 
-u32 get_system_tick(void) 
+u32 get_system_tick(void)
 {
-    return g_system.system_tick;
+    u32 tick_value;
+    __disable_irq();
+    tick_value = g_system.system_tick;
+    __enable_irq();
+    return tick_value;
 }
 
-void TIM2_IRQHandler(void) 
+void TIM2_IRQHandler(void)
 {
    if ((TIM2->SR & TIM_SR_UIF) != 0U) 
    {
@@ -111,9 +116,9 @@ void TIM2_IRQHandler(void)
 }
 
 // UART Interrupt Service Routine
-void USART1_IRQHandler(void) 
+void USART1_IRQHandler(void)
 {
-    u32 sr = USART1->SR;
+    const u32 sr = USART1->SR;
     
     if (((USART1->CR1 & USART_CR1_TXEIE) != 0U) && ((sr & USART_SR_TXE) != 0U)) {
         if (g_uart_tx.read_idx != g_uart_tx.write_idx) {
@@ -125,34 +130,66 @@ void USART1_IRQHandler(void)
     }
     
     if ((sr & (USART_SR_ORE | USART_SR_NE | USART_SR_FE | USART_SR_PE)) != 0U) {
-        volatile u32 dummy = USART1->DR;
+        const volatile u32 dummy = USART1->DR;
         (void)dummy;
-        
-        // might want to increment error counters here
-        // or take other recovery actions
+        // Error counters could be incremented here
     }
     
-    if ((sr & USART_SR_RXNE) != 0) {
-        volatile u8 received_data = (u8)USART1->DR;
-        // Process received data here if needed
-        (void)received_data; // Suppress warning if not used
+    if ((sr & USART_SR_RXNE) != 0U) {
+        const volatile u8 received_data = (u8)USART1->DR;
+        (void)received_data; // Process received data here if needed
     }
+}
+
+static void clear_spi_rx_buffer(void)
+{
+    while ((SPI1->SR & SPI_SR_RXNE) != 0U) {
+        const volatile u8 dummy = (u8)SPI1->DR;
+        (void)dummy;
+    }
+}
+
+static bool is_uart_enabled(void)
+{
+    return ((USART1->CR1 & USART_CR1_UE) != 0U);
+}
+
+static bool is_timer_running(const u32 timer_base)
+{
+    bool is_running = false;
+    
+    if (timer_base == (u32)TIM2) {
+        is_running = ((TIM2->CR1 & TIM_CR1_CEN) != 0U);
+    } else if (timer_base == (u32)TIM3) {
+        is_running = ((TIM3->CR1 & TIM_CR1_CEN) != 0U);
+    } else {
+        // Invalid timer base
+    }
+    
+    return is_running;
 }
 
 // Use static buffer to avoid stack allocation
-static int read_gyro_data(void) 
+static ErrorCode_t read_gyro_data(void)
 {
-   if (spi_read_burst(LSM6DSO_OUTX_L_G, g_spi_buffer, SPI_BURST_READ_LEN) != 0) {
-       return -1;
-   }
-   g_system.gyro_x = (s16)(((s16)g_spi_buffer[1] << 8) | g_spi_buffer[0]);
-   g_system.gyro_y = (s16)(((s16)g_spi_buffer[3] << 8) | g_spi_buffer[2]);
-   g_system.gyro_z = (s16)(((s16)g_spi_buffer[5] << 8) | g_spi_buffer[4]);
-   return 0;
+    ErrorCode_t result = ERROR_NONE;
+    
+    if (spi_read_burst(LSM6DSO_OUTX_L_G, g_spi_buffer, SPI_BURST_READ_LEN) != 0) {
+        result = ERROR_SPI_TIMEOUT;
+    } else {
+        g_system.gyro_x = (s16)(((s16)g_spi_buffer[ARRAY_INDEX_ONE] << SHIFT_8_BITS) | 
+                                (s16)g_spi_buffer[ARRAY_INDEX_ZERO]);
+        g_system.gyro_y = (s16)(((s16)g_spi_buffer[ARRAY_INDEX_THREE] << SHIFT_8_BITS) | 
+                                (s16)g_spi_buffer[ARRAY_INDEX_TWO]);
+        g_system.gyro_z = (s16)(((s16)g_spi_buffer[ARRAY_INDEX_FIVE] << SHIFT_8_BITS) | 
+                                (s16)g_spi_buffer[ARRAY_INDEX_FOUR]);
+    }
+    
+    return result;
 }
 
 // Helper function to change state safely
-static inline void set_state(State_t new_state) 
+static void set_state(const State_t new_state)
 {
     __disable_irq();
     g_system.current_state = new_state;
@@ -169,8 +206,8 @@ static void handle_init_state(void)
     init_timer();
 
     // Configure LSM6DSO Gyroscope
-    if ((spi_write(LSM6DSO_CTRL2_G, LSM6DSO_GYRO_CONFIG) != 0) || 
-        (spi_write(LSM6DSO_CTRL3_C, LSM6DSO_CTRL3_BDU) != 0)) {
+    if ((spi_write(LSM6DSO_CTRL2_G, LSM6DSO_GYRO_208HZ_2000DPS) != 0) || 
+        (spi_write(LSM6DSO_CTRL3_C, LSM6DSO_BDU_ENABLE)!= 0)) {
         set_state(STATE_ERROR);
         return;
     }
@@ -180,14 +217,16 @@ static void handle_init_state(void)
     set_state(STATE_STABILIZING);
 }
 
-static void handle_stabilizing_state(void) 
+static void handle_stabilizing_state(void)
 {
-    if ((get_system_tick() - g_system.stabilization_start_time) < LSM6DSO_STABILIZATION_MS) {
+    const u32 current_tick = get_system_tick();
+    
+    if ((current_tick - g_system.stabilization_start_time) < LSM6DSO_STABILIZATION_MS) {
         return;
     }
 
     if ((g_system.retry_count > 0U) && 
-        ((get_system_tick() - g_system.last_retry_time) >= LSM6DSO_RETRY_DELAY_MS)) {
+        ((current_tick - g_system.last_retry_time) >= LSM6DSO_RETRY_DELAY_MS)) {
         
         u8 chip_id = 0U;
         if (spi_read(LSM6DSO_WHO_AM_I, &chip_id) != 0) {
@@ -195,15 +234,19 @@ static void handle_stabilizing_state(void)
             return;
         }
 
-        if (chip_id == LSM6DSO_ID_VAL) {
+        if (chip_id == LSM6DSO_EXPECTED_ID) {
             set_state(STATE_IDLE);
         } else {
             g_system.retry_count--;
-            g_system.last_retry_time = get_system_tick();
+            g_system.last_retry_time = current_tick;
             
-            (void)snprintf(g_format_buffer, sizeof(g_format_buffer),
-                    "ERR:ID 0x%02X, retries left: %u\r\n", chip_id, g_system.retry_count);
-            uart_puts(g_format_buffer);
+            const int snprintf_result = snprintf(g_format_buffer, sizeof(g_format_buffer),
+                    "ERR:ID 0x%02X, retries left: %u\r\n", 
+                    (unsigned int)chip_id, (unsigned int)g_system.retry_count);
+            
+            if ((snprintf_result > 0) && ((size_t)snprintf_result < sizeof(g_format_buffer))) {
+                uart_puts(g_format_buffer);
+            }
             
             if (g_system.retry_count == 0U) {
                 set_state(STATE_ERROR);
@@ -212,30 +255,35 @@ static void handle_stabilizing_state(void)
     }
 }
 
-static void handle_read_state(void) 
+static void handle_read_state(void)
 {
-    if (read_gyro_data() != 0) {
+    if (read_gyro_data() != ERROR_NONE) {
         set_state(STATE_ERROR);
     } else {
         set_state(STATE_PROCESS);
     }
 }
 
-static void handle_process_state(void) 
+static void handle_process_state(void)
 {
-    (void)snprintf(g_format_buffer, sizeof(g_format_buffer), 
+    const int snprintf_result = snprintf(g_format_buffer, sizeof(g_format_buffer), 
             "X:%6d Y:%6d Z:%6d\r\n", 
-            g_system.gyro_x, g_system.gyro_y, g_system.gyro_z);
-    set_state(STATE_OUTPUT);
+            (int)g_system.gyro_x, (int)g_system.gyro_y, (int)g_system.gyro_z);
+    
+    if ((snprintf_result > 0) && ((size_t)snprintf_result < sizeof(g_format_buffer))) {
+        set_state(STATE_OUTPUT);
+    } else {
+        set_state(STATE_ERROR);
+    }
 }
 
-static void handle_output_state(void) 
+static void handle_output_state(void)
 {
     uart_puts(g_format_buffer);
     set_state(STATE_IDLE);
 }
 
-static void handle_error_state(void) 
+static void handle_error_state(void)
 {
     uart_puts("System halted due to error\r\n");
     while (1) {
@@ -243,7 +291,7 @@ static void handle_error_state(void)
     }
 }
 
-int main(void) 
+int main(void)
 {
     g_system.current_state = STATE_INIT;
     
@@ -266,15 +314,15 @@ int main(void)
 }
 
 // Initialize peripheral clocks
-void init_clocks(void) 
+void init_clocks(void)
 {
     RCC->CR |= RCC_CR_HSION;
     while((RCC->CR & RCC_CR_HSIRDY) == 0U) { /* Wait for HSI */ }
 
-    RCC->CFGR = 0x00000000;
+    RCC->CFGR = 0x00000000UL;
     RCC->CR &= ~(RCC_CR_HSEON | RCC_CR_CSSON | RCC_CR_PLLON);
     RCC->CR &= ~RCC_CR_HSEBYP;
-    RCC->CIR = 0x00000000;    
+    RCC->CIR = 0x00000000UL;    
     // RCC->CFGR &= ~(RCC_CFGR_PLLSRC | RCC_CFGR_PLLXTPRE | RCC_CFGR_PLLMULL);
     // RCC->CIR = 0x009F0000; 
 
@@ -324,7 +372,7 @@ void init_clocks(void)
     RCC->APB1ENR |= (RCC_APB1ENR_TIM2EN | RCC_APB1ENR_TIM3EN);
 }
 
-void init_gpio(void) 
+void init_gpio(void)
 {
     GPIOA->CRL &= ~(GPIO_CRL_MODE0 | GPIO_CRL_CNF0 | 
                     GPIO_CRL_MODE1 | GPIO_CRL_CNF1 |
@@ -343,14 +391,14 @@ void init_gpio(void)
                    GPIO_CRH_CNF12_1 | GPIO_CRH_CNF13_1 |
                    GPIO_CRH_CNF14_1 | GPIO_CRH_CNF15_1);
     
-    GPIOA->ODR &= ~(BIT(0) | BIT(1) | BIT(2) | BIT(3) | BIT(8) | 
-                    BIT(11) | BIT(12) | BIT(13) | BIT(14) | BIT(15));
+    GPIOA->ODR &= ~(BIT(0U) | BIT(1U) | BIT(2U) | BIT(3U) | BIT(8U) | 
+                    BIT(11U) | BIT(12U) | BIT(13U) | BIT(14U) | BIT(15U));
 
     
     // PA4 (CS): Output, 2 MHz speed, push-pull
     GPIOA->CRL &= ~(GPIO_CRL_MODE4 | GPIO_CRL_CNF4);
     GPIOA->CRL |= GPIO_CRL_MODE4_1;  // 2MHz output
-    GPIOA->ODR |= BIT(4);  // Set CS high initially
+    GPIOA->ODR |= BIT(4U);  // Set CS high initially
 
     // PA5 (SCK): AF push-pull, 2MHz
     GPIOA->CRL &= ~(GPIO_CRL_MODE5 | GPIO_CRL_CNF5);
@@ -373,24 +421,24 @@ void init_gpio(void)
     GPIOA->CRH |= GPIO_CRH_CNF10_0;
 
     RCC->APB2ENR |= RCC_APB2ENR_IOPBEN;
-    GPIOB->CRL = 0x88888888;
-    GPIOB->CRH = 0x88888888;
-    GPIOB->ODR = 0x0000;
+    GPIOB->CRL = 0x88888888UL;
+    GPIOB->CRH = 0x88888888UL;
+    GPIOB->ODR = 0x0000U;
 
     RCC->APB2ENR |= RCC_APB2ENR_IOPCEN;
-    GPIOC->CRL = 0x88888888;
-    GPIOC->CRH = 0x88888888;
-    GPIOC->ODR = 0x0000;
+    GPIOC->CRL = 0x88888888UL;
+    GPIOC->CRH = 0x88888888UL;
+    GPIOC->ODR = 0x0000U;
 }
 
-void init_spi(void) 
+void init_spi(void)
 {
     RCC->APB2RSTR |= RCC_APB2RSTR_SPI1RST;
     RCC->APB2RSTR &= ~RCC_APB2RSTR_SPI1RST;
     
     SPI1->CR1 &= ~SPI_CR1_SPE;
     
-    SPI1->CR1 = 0;
+    SPI1->CR1 = 0UL;
     SPI1->CR1 |= SPI_CR1_MSTR;
     SPI1->CR1 |= SPI_CR1_BR_2;      // Baud rate: fPCLK/32 (~750kHz at 24MHz) - safer for LSM6DSO
     SPI1->CR1 |= SPI_CR1_CPOL;      // Clock polarity: idle high (Mode 3)
@@ -398,7 +446,7 @@ void init_spi(void)
     SPI1->CR1 |= SPI_CR1_SSM;       // Software slave management
     SPI1->CR1 |= SPI_CR1_SSI;       // Internal slave select high
     
-    SPI1->CR2 = 0;
+    SPI1->CR2 = 0UL;
     
     volatile u32 dummy = SPI1->DR;
     dummy = SPI1->SR;
@@ -406,8 +454,9 @@ void init_spi(void)
     
     SPI1->CR1 |= SPI_CR1_SPE;
     
-    u32 timeout = 1000;
-    while (!(SPI1->CR1 & SPI_CR1_SPE) && timeout--) {
+    u32 timeout = 1000UL;
+    while (((SPI1->CR1 & SPI_CR1_SPE) == 0U) && (timeout > 0U)) {
+        timeout--;
         __NOP();
     }
     
@@ -415,7 +464,7 @@ void init_spi(void)
 }
 
 // Initialize UART1 for 115200 baud
-void init_uart(void) 
+void init_uart(void)
 {
     RCC->APB2RSTR |= RCC_APB2RSTR_USART1RST;
     RCC->APB2RSTR &= ~RCC_APB2RSTR_USART1RST;
@@ -430,7 +479,7 @@ void init_uart(void)
     
     USART1->CR3 &= ~(USART_CR3_RTSE | USART_CR3_CTSE);
     
-    USART1->SR = 0;
+    USART1->SR = 0UL;
     
     USART1->CR1 &= ~(USART_CR1_RXNEIE | USART_CR1_TCIE | USART_CR1_TXEIE | 
                      USART_CR1_PEIE | USART_CR1_IDLEIE);
@@ -439,42 +488,43 @@ void init_uart(void)
     
     USART1->CR1 |= USART_CR1_UE;
     
-    u32 timeout = 1000;
-    while (!(USART1->SR & USART_SR_TC) && timeout--) {
+    u32 timeout = 1000U;
+    while (((USART1->SR & USART_SR_TC) == 0U) && (timeout > 0U)) {
+        timeout--;
         __NOP();
     }
     
-    volatile u32 dummy = USART1->SR;
-    USART1->DR = 0;
-    (void)dummy;
+    const volatile u32 dummy_sr = USART1->SR;
+    USART1->DR = UART_DUMMY_BYTE;
+    (void)dummy_sr;
     
-    NVIC_SetPriority(USART1_IRQn, 2);
+    NVIC_SetPriority(USART1_IRQn, 2U);
     NVIC_EnableIRQ(USART1_IRQn);
     
-    if (!(USART1->CR1 & USART_CR1_UE) || 
-        !(USART1->CR1 & USART_CR1_TE) ||
-        USART1->BRR != UART_BRR) {
-        //TODO: proper error handling
-        // Configuration failed - you might want to set an error flag
-        // or retry initialization
-        while(1); // For now, halt on error
+    if (((USART1->CR1 & USART_CR1_UE) == 0U) || 
+        ((USART1->CR1 & USART_CR1_TE) == 0U) ||
+        (USART1->BRR != UART_BRR)) {
+        set_state(STATE_ERROR);
     }
 }
 
 // Initialize TIM2 for 100 Hz interrupts and TIM3 for delays
-void init_timer(void) 
+void init_timer(void)
 {
+    u32 timeout;
+    u16 initial_count;
+
     RCC->APB1RSTR |= (RCC_APB1RSTR_TIM2RST | RCC_APB1RSTR_TIM3RST);
     RCC->APB1RSTR &= ~(RCC_APB1RSTR_TIM2RST | RCC_APB1RSTR_TIM3RST);
     
-    for (volatile int i = 0; i < 100; i++) __NOP();
+    for (volatile int i = 0; i < 100; i++) { __NOP(); }
     
-    TIM2->CR1 = 0;
-    TIM2->CR2 = 0;
-    TIM2->SMCR = 0;
-    TIM2->DIER = 0;
-    TIM2->SR = 0;
-    TIM2->CNT = 0;
+    TIM2->CR1 = 0UL;
+    TIM2->CR2 = 0UL;
+    TIM2->SMCR = 0UL;
+    TIM2->DIER = 0UL;
+    TIM2->SR = 0UL;
+    TIM2->CNT = 0UL;
     
     TIM2->PSC = TIM2_PSC;
     TIM2->ARR = TIM2_ARR;
@@ -485,32 +535,33 @@ void init_timer(void)
     
     TIM2->DIER |= TIM_DIER_UIE;
     
-    NVIC_SetPriority(TIM2_IRQn, 3);
+    NVIC_SetPriority(TIM2_IRQn, 3U);
     NVIC_EnableIRQ(TIM2_IRQn);
     
     TIM2->CR1 |= TIM_CR1_CEN;
     
-    u32 timeout = TIMER_CONFIG_TIMEOUT;
-    u16 initial_count = TIM2->CNT;
-    while (TIM2->CNT == initial_count && timeout--) {
+    timeout = TIMER_CONFIG_TIMEOUT;
+    initial_count = TIM2->CNT;
+    while ((TIM2->CNT == initial_count) && (timeout > 0U)) {
+        timeout--;
         __NOP();
     }
-    if (timeout == 0) {
-        // TODO: proper error handling
-        // TIM2 failed to start - handle error
-        snprintf(g_format_buffer, sizeof(g_format_buffer), 
+    if (timeout == 0U) {
+        const int snprintf_result = snprintf(g_format_buffer, sizeof(g_format_buffer), 
                 "ERR: TIM2 failed to start\r\n");
-        uart_puts(g_format_buffer);
+        if ((snprintf_result > 0) && ((size_t)snprintf_result < sizeof(g_format_buffer))) {
+            uart_puts(g_format_buffer);
+        }
         set_state(STATE_ERROR);
         return;
     }
     
-    TIM3->CR1 = 0;
-    TIM3->CR2 = 0;
-    TIM3->SMCR = 0;
-    TIM3->DIER = 0;
-    TIM3->SR = 0;
-    TIM3->CNT = 0;
+    TIM3->CR1 = 0UL;
+    TIM3->CR2 = 0UL;
+    TIM3->SMCR = 0UL;
+    TIM3->DIER = 0UL;
+    TIM3->SR = 0UL;
+    TIM3->CNT = 0UL;
     
     TIM3->PSC = TIM3_PSC;
     TIM3->ARR = TIM3_ARR;
@@ -523,252 +574,346 @@ void init_timer(void)
     
     timeout = TIMER_CONFIG_TIMEOUT;
     initial_count = TIM3->CNT;
-    while (TIM3->CNT == initial_count && timeout--) {
+    while ((TIM3->CNT == initial_count) && (timeout > 0U)) {
+        timeout--;
         __NOP();
     }
-    if (timeout == 0) {
-        // TODO: proper error handling
-        // TIM3 failed to start - handle error
-        snprintf(g_format_buffer, sizeof(g_format_buffer), 
+    if (timeout == 0U) {
+        const int snprintf_result = snprintf(g_format_buffer, sizeof(g_format_buffer), 
                 "ERR: TIM3 failed to start\r\n");
-        uart_puts(g_format_buffer);
+        if ((snprintf_result > 0) && ((size_t)snprintf_result < sizeof(g_format_buffer))) {
+            uart_puts(g_format_buffer);
+        }
         set_state(STATE_ERROR);
         return;
     }
     
     // Optional: Print timer configuration for debugging
-    u32 tim2_freq = SYSTEM_CLOCK_HZ / ((TIM2->PSC + 1) * (TIM2->ARR + 1));
-    u32 tim3_freq = SYSTEM_CLOCK_HZ / ((TIM3->PSC + 1) * (TIM3->ARR + 1));
+    const u32 tim2_freq = SYSTEM_CLOCK_HZ / ((TIM2->PSC + 1UL) * (TIM2->ARR + 1UL));
+    const u32 tim3_freq = SYSTEM_CLOCK_HZ / ((TIM3->PSC + 1UL) * (TIM3->ARR + 1UL));
     
-    snprintf(g_format_buffer, sizeof(g_format_buffer), 
+    const int snprintf_result = snprintf(g_format_buffer, sizeof(g_format_buffer), 
             "Timers OK: TIM2=%luHz TIM3=%luHz\r\n", tim2_freq, tim3_freq);
-    uart_puts(g_format_buffer);
+    if ((snprintf_result > 0) && ((size_t)snprintf_result < sizeof(g_format_buffer))) {
+        uart_puts(g_format_buffer);
+    }
 }
 
 // delay function using TIM3 (1 ms resolution, blocking) // use with caution !!!
-void delay_ms(u32 ms) 
+void delay_ms(const u32 ms)
 {
-    if (ms == 0) return;
+    u32 timeout;
     
-    if (!(TIM3->CR1 & TIM_CR1_CEN)) {
-        for (volatile u32 i = 0; i < (ms * (SYSTEM_CLOCK_HZ / 1000)); i++) {
+    if (ms == 0U) {
+        return;
+    }
+    
+    if (!is_timer_running((u32)TIM3)) {
+        for (volatile u32 i = 0U; i < (ms * (SYSTEM_CLOCK_HZ / 1000UL)); i++) {
             __NOP();
         }
         return;
     }
     
-    for (u32 i = 0; i < ms; i++) {
-        TIM3->CNT = 0;
+    for (u32 i = 0U; i < ms; i++) {
+        TIM3->CNT = 0UL;
         
-        u32 timeout = 10000;
-        while (TIM3->CNT == 0 && timeout--) {
+        timeout = 10000U;
+        while ((TIM3->CNT == 0U) && (timeout > 0U)) {
+            timeout--;
             __NOP();
         }
         
-        while (TIM3->CNT < 1 && timeout--) {
+        while ((TIM3->CNT < 1U) && (timeout > 0U)) {
+            timeout--;
             __NOP();
         }
         
-        if (timeout == 0) {
+        if (timeout == 0U) {
             break;
         }
     }
 }
 
 // Non-blocking delay function using system tick
-u8 delay_ms_nb(u32 ms, u32 *start_time) 
+u8 delay_ms_nb(const u32 ms, u32 *const start_time)
 {
+    u8 delay_complete = 0U;
+    
+    if (start_time == NULL) {
+        return 0U;
+    }
+    
     if (*start_time == 0U) {
         *start_time = get_system_tick();
-        return 0;
-    }
-    
-    if ((get_system_tick() - *start_time) >= ms) {
+    } else if ((get_system_tick() - *start_time) >= ms) {
         *start_time = 0U;
-        return 1;
+        delay_complete = 1U;
+    } else {
+        // Delay not complete
     }
     
-    return 0;
+    return delay_complete;
 }
 
-void get_timer_status(void) 
+void get_timer_status(void)
 {
-    snprintf(g_format_buffer, sizeof(g_format_buffer), 
+    int snprintf_result = snprintf(g_format_buffer, sizeof(g_format_buffer), 
             "TIM2: EN=%d CNT=%u PSC=%u ARR=%u\r\n", 
-            (TIM2->CR1 & TIM_CR1_CEN) ? 1 : 0,
+            is_timer_running((u32)TIM2) ? 1 : 0,
             (unsigned int)TIM2->CNT, 
             (unsigned int)TIM2->PSC, 
             (unsigned int)TIM2->ARR);
-    uart_puts(g_format_buffer);
     
-    snprintf(g_format_buffer, sizeof(g_format_buffer), 
+    if ((snprintf_result > 0) && ((size_t)snprintf_result < sizeof(g_format_buffer))) {
+        uart_puts(g_format_buffer);
+    }
+    
+    snprintf_result = snprintf(g_format_buffer, sizeof(g_format_buffer), 
             "TIM3: EN=%d CNT=%u PSC=%u ARR=%u\r\n", 
-            (TIM3->CR1 & TIM_CR1_CEN) ? 1 : 0,
+            is_timer_running((u32)TIM3) ? 1 : 0,
             (unsigned int)TIM3->CNT, 
             (unsigned int)TIM3->PSC, 
             (unsigned int)TIM3->ARR);
-    uart_puts(g_format_buffer);
+    
+    if ((snprintf_result > 0) && ((size_t)snprintf_result < sizeof(g_format_buffer))) {
+        uart_puts(g_format_buffer);
+    }
 }
 
 // Write a single byte via SPI with timeout
-int spi_write(u8 reg, u8 data) 
+int spi_write(const u8 reg, const u8 data)
 {
     u32 timeout;
     
-    while (SPI1->SR & SPI_SR_RXNE) {
-        volatile u8 dummy = SPI1->DR;
-        (void)dummy;
-    }
+    clear_spi_rx_buffer();
     
     CS_PIN_LOW();
     
     timeout = SPI_UART_TIMEOUT;
-    while (((SPI1->SR & SPI_SR_TXE) == 0U) && (timeout > 0U)) { timeout--; }
+    while (((SPI1->SR & SPI_SR_TXE) == 0U) && (timeout > 0U)) { 
+        timeout--; 
+    }
     if (timeout == 0U) { 
         CS_PIN_HIGH(); 
-        return -1; 
+        return ERROR_SPI_TIMEOUT; 
     }
-    SPI1->DR = reg;
+    SPI1->DR = (u16)reg;
     
     timeout = SPI_UART_TIMEOUT;
-    while (((SPI1->SR & SPI_SR_RXNE) == 0U) && (timeout > 0U)) { timeout--; }
-    if (timeout == 0U) { CS_PIN_HIGH(); return -1; }
-    (void)SPI1->DR;
+    while (((SPI1->SR & SPI_SR_RXNE) == 0U) && (timeout > 0U)) {
+        timeout--;
+        __NOP();
+    }
+    if (timeout == 0U) { 
+        CS_PIN_HIGH(); 
+        return ERROR_SPI_TIMEOUT; 
+    }
+    const volatile u8 dummy1 = (u8)SPI1->DR;
+    (void)dummy1;
     
     timeout = SPI_UART_TIMEOUT;
-    while (((SPI1->SR & SPI_SR_TXE) == 0U) && (timeout > 0U)) { timeout--; }
-    if (timeout == 0U) { CS_PIN_HIGH(); return -1; }
-    SPI1->DR = data;
+    while (((SPI1->SR & SPI_SR_TXE) == 0U) && (timeout > 0U)) {
+        timeout--;
+        __NOP();
+    }
+    if (timeout == 0U) { 
+        CS_PIN_HIGH(); 
+        return ERROR_SPI_TIMEOUT; 
+    }
+    SPI1->DR = (u16)data;
     
     timeout = SPI_UART_TIMEOUT;
-    while (((SPI1->SR & SPI_SR_RXNE) == 0U) && (timeout > 0U)) { timeout--; }
-    if (timeout == 0U) { CS_PIN_HIGH(); return -1; }
-    (void)SPI1->DR;
+    while (((SPI1->SR & SPI_SR_RXNE) == 0U) && (timeout > 0U)) {
+        timeout--;
+        __NOP();
+    }
+    if (timeout == 0U) { 
+        CS_PIN_HIGH(); 
+        return ERROR_SPI_TIMEOUT; 
+    }
+    const volatile u8 dummy2 = (u8)SPI1->DR;
+    (void)dummy2;
     
     timeout = SPI_UART_TIMEOUT;
-    while (((SPI1->SR & SPI_SR_BSY) != 0U) && (timeout > 0U)) { timeout--; }
-    if (timeout == 0U) { CS_PIN_HIGH(); return -1; }
+    while (((SPI1->SR & SPI_SR_BSY) != 0U) && (timeout > 0U)) {
+        timeout--;
+        __NOP();
+    }
+    if (timeout == 0U) { 
+        CS_PIN_HIGH(); 
+        return ERROR_SPI_TIMEOUT; 
+    }
     
     CS_PIN_HIGH();
     
-    for (volatile int i = 0; i < 10; i++) __NOP();
+    for (volatile int i = 0; i < DELAY_LOOP_COUNT; i++) { __NOP(); }
     
-    return 0;
+    return ERROR_NONE;
 }
 
 // Read a single byte via SPI with timeout
-int spi_read(u8 reg, u8* data) 
+int spi_read(const u8 reg, u8* const data)
 {
     u32 timeout;
     
-    while (SPI1->SR & SPI_SR_RXNE) {
-        volatile u8 dummy = SPI1->DR;
-        (void)dummy;
+    if (data == NULL) {
+        return ERROR_INVALID_PARAM;
     }
+    
+    clear_spi_rx_buffer();
     
     CS_PIN_LOW();
     
     timeout = SPI_UART_TIMEOUT;
-    while (((SPI1->SR & SPI_SR_TXE) == 0U) && (timeout > 0U)) { timeout--; }
-    if (timeout == 0U) { CS_PIN_HIGH(); return -1; }
-    SPI1->DR = (reg | 0x80U);
+    while (((SPI1->SR & SPI_SR_TXE) == 0U) && (timeout > 0U)) { 
+        timeout--; 
+    }
+    if (timeout == 0U) { 
+        CS_PIN_HIGH(); 
+        return ERROR_SPI_TIMEOUT; 
+    }
+    SPI1->DR = (u16)(reg | 0x80U);
     
     timeout = SPI_UART_TIMEOUT;
-    while (((SPI1->SR & SPI_SR_RXNE) == 0U) && (timeout > 0U)) { timeout--; }
-    if (timeout == 0U) { CS_PIN_HIGH(); return -1; }
+    while (((SPI1->SR & SPI_SR_RXNE) == 0U) && (timeout > 0U)) { 
+        timeout--; 
+    }
+    if (timeout == 0U) { 
+        CS_PIN_HIGH(); 
+        return ERROR_SPI_TIMEOUT; 
+    }
     (void)SPI1->DR;
     
     timeout = SPI_UART_TIMEOUT;
-    while (((SPI1->SR & SPI_SR_TXE) == 0U) && (timeout > 0U)) { timeout--; }
-    if (timeout == 0U) { CS_PIN_HIGH(); return -1; }
-    SPI1->DR = 0xFF;
+    while (((SPI1->SR & SPI_SR_TXE) == 0U) && (timeout > 0U)) { 
+        timeout--; 
+    }
+    if (timeout == 0U) { 
+        CS_PIN_HIGH(); 
+        return ERROR_SPI_TIMEOUT; 
+    }
+    SPI1->DR = (u16)SPI_DUMMY_BYTE;
     
     timeout = SPI_UART_TIMEOUT;
-    while (((SPI1->SR & SPI_SR_RXNE) == 0U) && (timeout > 0U)) { timeout--; }
-    if (timeout == 0U) { CS_PIN_HIGH(); return -1; }
-    *data = (uint8_t)SPI1->DR;
+    while (((SPI1->SR & SPI_SR_RXNE) == 0U) && (timeout > 0U)) { 
+        timeout--; 
+    }
+    if (timeout == 0U) { 
+        CS_PIN_HIGH(); 
+        return ERROR_SPI_TIMEOUT; 
+    }
+    *data = (u8)SPI1->DR;
     
     timeout = SPI_UART_TIMEOUT;
-    while (((SPI1->SR & SPI_SR_BSY) != 0U) && (timeout > 0U)) { timeout--; }
+    while (((SPI1->SR & SPI_SR_BSY) != 0U) && (timeout > 0U)) { 
+        timeout--; 
+    }
     
     CS_PIN_HIGH();
     
-    for (volatile int i = 0; i < 10; i++) __NOP();
+    for (volatile int i = 0; i < DELAY_LOOP_COUNT; i++) { __NOP(); }
     
-    return 0;
+    return ERROR_NONE;
 }
 
 // Read multiple bytes via SPI (burst mode) with timeout
-int spi_read_burst(u8 reg, u8* buffer, u8 len) 
+int spi_read_burst(const u8 reg, u8* const buffer, const u8 len)
 {
-    if ((buffer == NULL) || (len == 0U)) {
-        return -1;
-    }
-    
     u32 timeout;
     
-    while (SPI1->SR & SPI_SR_RXNE) {
-        volatile u8 dummy = SPI1->DR;
-        (void)dummy;
+    if ((buffer == NULL) || (len == 0U)) {
+        return ERROR_INVALID_PARAM;
     }
+    
+    clear_spi_rx_buffer();
     
     CS_PIN_LOW();
     
     timeout = SPI_UART_TIMEOUT;
-    while (((SPI1->SR & SPI_SR_TXE) == 0U) && (timeout > 0U)) { timeout--; }
-    if (timeout == 0U) { CS_PIN_HIGH(); return -1; }
-    SPI1->DR = (reg | 0x80U);
+    while (((SPI1->SR & SPI_SR_TXE) == 0U) && (timeout > 0U)) {
+        timeout--;
+        __NOP();
+    }
+    if (timeout == 0U) { 
+        CS_PIN_HIGH(); 
+        return ERROR_SPI_TIMEOUT; 
+    }
+    SPI1->DR = (u16)(reg | 0x80U);
     
     timeout = SPI_UART_TIMEOUT;
-    while (((SPI1->SR & SPI_SR_RXNE) == 0U) && (timeout > 0U)) { timeout--; }
-    if (timeout == 0U) { CS_PIN_HIGH(); return -1; }
-    (void)SPI1->DR;
+    while (((SPI1->SR & SPI_SR_RXNE) == 0U) && (timeout > 0U)) {
+        timeout--;
+        __NOP();
+    }
+    if (timeout == 0U) { 
+        CS_PIN_HIGH(); 
+        return ERROR_SPI_TIMEOUT; 
+    }
+    const volatile u8 dummy = (u8)SPI1->DR;
+    (void)dummy;
     
-    for (uint8_t i = 0; i < len; i++)
-    {
+    for (u8 i = 0U; i < len; i++) {
         timeout = SPI_UART_TIMEOUT;
-        while (((SPI1->SR & SPI_SR_TXE) == 0U) && (timeout > 0U)) { timeout--; }
-        if (timeout == 0U) { CS_PIN_HIGH(); return -1; }
-        SPI1->DR = 0xFF;
-
+        while (((SPI1->SR & SPI_SR_TXE) == 0U) && (timeout > 0U)) {
+            timeout--;
+            __NOP();
+        }
+        if (timeout == 0U) { 
+            CS_PIN_HIGH(); 
+            return ERROR_SPI_TIMEOUT; 
+        }
+        SPI1->DR = (u16)SPI_DUMMY_BYTE;
+        
         timeout = SPI_UART_TIMEOUT;
-        while (((SPI1->SR & SPI_SR_RXNE) == 0U) && (timeout > 0U)) { timeout--; }
-        if (timeout == 0U) { CS_PIN_HIGH(); return -1; }
-        buffer[i] = (uint8_t)SPI1->DR;
+        while (((SPI1->SR & SPI_SR_RXNE) == 0U) && (timeout > 0U)) {
+            timeout--;
+            __NOP();
+        }
+        if (timeout == 0U) { 
+            CS_PIN_HIGH(); 
+            return ERROR_SPI_TIMEOUT; 
+        }
+        buffer[i] = (u8)SPI1->DR;
     }
     
     timeout = SPI_UART_TIMEOUT;
-    while (((SPI1->SR & SPI_SR_BSY) != 0U) && (timeout > 0U)) { timeout--; }
- 
+    while (((SPI1->SR & SPI_SR_BSY) != 0U) && (timeout > 0U)) {
+        timeout--;
+        __NOP();
+    }
+    
     CS_PIN_HIGH();
     
-    for (volatile int i = 0; i < 10; i++) __NOP();
+    for (volatile int i = 0; i < DELAY_LOOP_COUNT; i++) {
+        __NOP();
+    }
     
-    return 0;
+    return ERROR_NONE;
 }
 
 // Send a string via UART using an interrupt-driven circular buffer (non-blocking)
-void uart_puts(const char *s) 
+void uart_puts(const char *const s)
 {
-    if (s == NULL) return;
+    size_t chars_added = 0U;
+    const char *str_ptr = s;
     
-    if (!(USART1->CR1 & USART_CR1_UE)) {
+    if ((s == NULL) || !is_uart_enabled()) {
         return;
     }
     
     __disable_irq();
     
-    size_t chars_added = 0U;
-    while (*s != '\0') {
-        u16 next_idx = (g_uart_tx.write_idx + 1U) % UART_TX_BUFFER_SIZE;
+    while (*str_ptr != '\0') {
+        const u16 next_idx = (g_uart_tx.write_idx + 1U) % UART_TX_BUFFER_SIZE;
         
         if (next_idx == g_uart_tx.read_idx) {
             break;
         }
         
-        g_uart_tx.buffer[g_uart_tx.write_idx] = *s;
+        g_uart_tx.buffer[g_uart_tx.write_idx] = *str_ptr;
         g_uart_tx.write_idx = next_idx;
-        s++;
+        str_ptr++;
         chars_added++;
     }
     

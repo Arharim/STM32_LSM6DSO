@@ -37,18 +37,18 @@ typedef int64_t s64;
 
 // LSM6DSO Gyroscope Constants
 #define LSM6DSO_WHO_AM_I    (0x0FU) // Chip ID register, ret 0x6C
-#define LSM6DSO_CTRL1_XL    (0x10)  // Accelerometer control
+#define LSM6DSO_CTRL1_XL    (0x10U) // Accelerometer control
 #define LSM6DSO_CTRL2_G     (0x11U) // Gyro control register
 #define LSM6DSO_CTRL3_C     (0x12U) // Ctrl register 3 (BDU, etc.)
 #define LSM6DSO_OUTX_L_G    (0x22U) // Gyro X-axis data LSB (start of 6-byte burst)
 
-#define LSM6DSO_ID_VAL      (0x6CU) // Expected chip ID
-#define LSM6DSO_GYRO_CONFIG (0x4C)  // 208 Hz, 2000 dps
-#define LSM6DSO_CTRL3_BDU   (0x40)  // Block Data Update enabled
+#define LSM6DSO_EXPECTED_ID        (0x6CU)
+#define LSM6DSO_GYRO_208HZ_2000DPS (0x4CU)
+#define LSM6DSO_BDU_ENABLE         (0x40U)
 
 // General purpose
 // Bit Masks for 32-bit Registers
-#define BIT(n) (1U << (n))
+#define BIT_MASK(n) (1U << ((n) & 0x1FU))
 
 // Function Prototypes
 void init_clocks(void);
@@ -56,10 +56,13 @@ void init_gpio(void);
 void init_spi(void);
 void init_uart(void);
 void init_timer(void);
+
 void delay_ms(u32 ms);
+
 int spi_write(u8 reg, u8 data);
 int spi_read(u8 reg, u8* data);
 int spi_read_burst(u8 reg, u8* buffer, u8 len);
+
 void uart_puts(const char *s);
 u32 get_system_tick(void);
 
