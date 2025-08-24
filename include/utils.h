@@ -64,8 +64,11 @@ typedef int64_t s64;
 
 // LSM6DSO Configuration Values
 #define LSM6DSO_EXPECTED_ID        0x6CU
-#define LSM6DSO_GYRO_208HZ_2000DPS 0x60U // ODR=208Hz, FS=2000dps
+#define LSM6DSO_GYRO_208HZ_2000DPS 0x5CU // ODR=208Hz, FS=2000 dps (FS_G=11)
 #define LSM6DSO_BDU_ENABLE         0x40U // Block Data Update enable
+// Sensitivity for FS=2000 dps
+#define LSM6DSO_GYRO_SENSITIVITY_MDPS  (70U) // 70 mdps/LSB
+#define LSM6DSO_GYRO_DPSx100_PER_LSB   (7)   // 0.07 dps/LSB -> dps*100 per LSB
 
 // LSM6DSO Status Register Bits
 #define LSM6DSO_STATUS_XLDA 0x01U // Accelerometer data available

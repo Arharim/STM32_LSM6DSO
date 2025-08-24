@@ -247,6 +247,18 @@ static void handle_stabilizing_state(void) {
 }
 
 static void handle_read_state(void) {
+	u8 status = 0U;
+	if (spi_read(LSM6DSO_STATUS_REG, &status) != 0) {
+		set_state(STATE_ERROR);
+		return;
+	}
+
+	// If new gyro data is not available yet, skip this cycle (non-blocking)
+	if ((status & LSM6DSO_STATUS_GDA) == 0U) {
+		set_state(STATE_IDLE);
+		return;
+	}
+
 	if (read_gyro_data() != ERROR_NONE) {
 		set_state(STATE_ERROR);
 	} else {
@@ -255,9 +267,28 @@ static void handle_read_state(void) {
 }
 
 static void handle_process_state(void) {
-	const int snprintf_result = snprintf(
-	    g_format_buffer, sizeof(g_format_buffer), "X:%6d Y:%6d Z:%6d\r\n",
-	    (int)g_system.gyro_x, (int)g_system.gyro_y, (int)g_system.gyro_z);
+	// Convert raw LSB to dps with FS=2000 dps: 0.07 dps/LSB -> dps*100 = raw*7
+	s32 x100 = (s32)g_system.gyro_x * (s32)LSM6DSO_GYRO_DPSx100_PER_LSB;
+	s32 y100 = (s32)g_system.gyro_y * (s32)LSM6DSO_GYRO_DPSx100_PER_LSB;
+	s32 z100 = (s32)g_system.gyro_z * (s32)LSM6DSO_GYRO_DPSx100_PER_LSB;
+
+	char sx = (x100 < 0) ? '-' : '+';
+	char sy = (y100 < 0) ? '-' : '+';
+	char sz = (z100 < 0) ? '-' : '+';
+
+	u32 xabs = (u32)((x100 < 0) ? -x100 : x100);
+	u32 yabs = (u32)((y100 < 0) ? -y100 : y100);
+	u32 zabs = (u32)((z100 < 0) ? -z100 : z100);
+
+	u32 xi = xabs / 100U, xf = xabs % 100U;
+	u32 yi = yabs / 100U, yf = yabs % 100U;
+	u32 zi = zabs / 100U, zf = zabs % 100U;
+
+	const int snprintf_result =
+	    snprintf(g_format_buffer, sizeof(g_format_buffer),
+	             "G[dps] X:%c%lu.%02lu Y:%c%lu.%02lu Z:%c%lu.%02lu\r\n", sx,
+	             (unsigned long)xi, (unsigned long)xf, sy, (unsigned long)yi,
+	             (unsigned long)yf, sz, (unsigned long)zi, (unsigned long)zf);
 
 	if ((snprintf_result > 0) &&
 	    ((size_t)snprintf_result < sizeof(g_format_buffer))) {
