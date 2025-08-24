@@ -1,0 +1,55 @@
+{
+	"folders": [
+		{
+			"name": "STM32_LSM6DSO",
+			"path": "."
+		}
+	],
+	"settings": {
+		"cSpell.words": [
+			"BSRR",
+			"buildprog",
+			"CFGR",
+			"cmsis",
+			"COMPILATIONDB",
+			"CPHA",
+			"CSSON",
+			"CTSE",
+			"DIER",
+			"DSTM",
+			"GPIOA",
+			"HPRE",
+			"HSEBYP",
+			"HSEON",
+			"HSERDY",
+			"HSION",
+			"HSIRDY",
+			"IDLEIE",
+			"IOPAEN",
+			"IOPBEN",
+			"mdps",
+			"NVIC",
+			"OUTY",
+			"OUTZ",
+			"PCLK",
+			"PEIE",
+			"PLLMULL",
+			"PLLON",
+			"PLLRDY",
+			"PLLSRC",
+			"PLLXTPRE",
+			"PRFTBE",
+			"RSTR",
+			"RTSE",
+			"RXNE",
+			"RXNEIE",
+			"SMCR",
+			"SSOE",
+			"ststm",
+			"TCIE",
+			"TXEIE",
+			"USART",
+			"XLDA"
+		]
+	}
+}
