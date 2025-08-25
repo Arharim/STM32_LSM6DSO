@@ -192,9 +192,6 @@ static void handle_init_state(void) {
 	init_timer();
 
 	// Configure LSM6DSO Gyroscope
-	// Enable gyro with desired ODR/FS and set CTRL3_C with BDU and IF_INC
-	// (auto-increment) Note: Writing only BDU (0x40) clears IF_INC, causing burst
-	// reads to repeat the same register.
 	if ((spi_write(LSM6DSO_CTRL2_G, LSM6DSO_GYRO_208HZ_2000DPS) != 0) ||
 	    (spi_write(LSM6DSO_CTRL3_C, (LSM6DSO_BDU_ENABLE | 0x04U)) != 0)) {
 		set_state(STATE_ERROR);
