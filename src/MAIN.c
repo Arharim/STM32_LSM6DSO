@@ -250,7 +250,6 @@ static void handle_read_state(void) {
 		return;
 	}
 
-	// If new gyro data is not available yet, skip this cycle (non-blocking)
 	if ((status & LSM6DSO_STATUS_GDA) == 0U) {
 		set_state(STATE_IDLE);
 		return;
