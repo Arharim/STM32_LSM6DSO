@@ -7,25 +7,27 @@
 #define CS_PIN_HIGH() (GPIOA->BSRR = BIT_MASK(4U))
 #define CS_PIN_LOW()  (GPIOA->BSRR = (BIT_MASK(4U) << 16U))
 
-#define LSM6DSO_STABILIZATION_MS (100U)
-#define LSM6DSO_RETRY_DELAY_MS   (10U)
-#define UART_TX_BUFFER_SIZE      (256U)
-#define SPI_BURST_READ_LEN       (6U)
-#define MAX_INIT_RETRIES         (3U)
-#define FORMAT_BUFFER_SIZE       (64U)
-#define GPIO_SPEED_2MHZ          (2U)
-#define SPI_DUMMY_BYTE           (0xFFU)
-#define UART_DUMMY_BYTE          (0x00U)
-#define DELAY_LOOP_COUNT         (10U)
-#define TIMEOUT_ZERO             (0U)
-#define ARRAY_INDEX_ZERO         (0U)
-#define ARRAY_INDEX_ONE          (1U)
-#define ARRAY_INDEX_TWO          (2U)
-#define ARRAY_INDEX_THREE        (3U)
-#define ARRAY_INDEX_FOUR         (4U)
-#define ARRAY_INDEX_FIVE         (5U)
-#define SHIFT_8_BITS             (8U)
-#define SHIFT_16_BITS            (16U)
+#define LSM6DSO_STABILIZATION_MS     (100U)
+#define LSM6DSO_RETRY_DELAY_MS       (10U)
+#define UART_TX_BUFFER_SIZE          (256U)
+#define SPI_BURST_READ_LEN           (6U)
+#define MAX_INIT_RETRIES             (3U)
+#define FORMAT_BUFFER_SIZE           (128U)
+#define GPIO_SPEED_2MHZ              (2U)
+#define SPI_DUMMY_BYTE               (0xFFU)
+#define UART_DUMMY_BYTE              (0x00U)
+#define DELAY_LOOP_COUNT             (10U)
+#define TIMEOUT_ZERO                 (0U)
+#define ARRAY_INDEX_ZERO             (0U)
+#define ARRAY_INDEX_ONE              (1U)
+#define ARRAY_INDEX_TWO              (2U)
+#define ARRAY_INDEX_THREE            (3U)
+#define ARRAY_INDEX_FOUR             (4U)
+#define ARRAY_INDEX_FIVE             (5U)
+#define SHIFT_8_BITS                 (8U)
+#define SHIFT_16_BITS                (16U)
+#define OUTPUT_FORMAT_CSV            (1U)
+#define LSM6DSO_ACC_mg_X1000_PER_LSB (61)
 
 // Error Codes
 typedef enum {
@@ -52,6 +54,9 @@ typedef struct {
 	volatile s16 gyro_x;
 	volatile s16 gyro_y;
 	volatile s16 gyro_z;
+	volatile s16 accel_x;
+	volatile s16 accel_y;
+	volatile s16 accel_z;
 	u8 retry_count;
 	u32 stabilization_start_time;
 	u32 last_retry_time;
@@ -65,7 +70,7 @@ typedef struct {
 } UartBuffer_t;
 
 // Global instances - organized and minimal
-static SystemState_t g_system = {STATE_INIT, 0, 0, 0, 0U, 0U, 0U, 0U};
+static SystemState_t g_system = {STATE_INIT, 0, 0, 0, 0, 0, 0, 0U, 0U, 0U, 0U};
 static UartBuffer_t g_uart_tx = {{0}, 0U, 0U};
 
 // Static buffers to avoid stack allocation in frequently called functions
@@ -81,10 +86,16 @@ static void handle_stabilizing_state(void);
 static void handle_read_state(void);
 static void handle_process_state(void);
 static void handle_output_state(void);
+static bool format_gyro_text(s32 x100, s32 y100, s32 z100);
+static bool format_gyro_csv(s32 x100, s32 y100, s32 z100);
 static void handle_error_state(void);
 static void clear_spi_rx_buffer(void);
 static bool is_uart_enabled(void);
 static bool is_timer_running(u32 timer_base);
+static ErrorCode_t read_accel_data(void);
+static bool format_imu_csv(s32 gx100, s32 gy100, s32 gz100, s32 ax_mg,
+                           s32 ay_mg, s32 az_mg);
+static void print_csv_header_once(void);
 
 void SysTick_Handler(void) { g_system.system_tick++; }
 
@@ -176,6 +187,27 @@ static ErrorCode_t read_gyro_data(void) {
 	return result;
 }
 
+static ErrorCode_t read_accel_data(void) {
+	ErrorCode_t result = ERROR_NONE;
+
+	if (spi_read_burst(LSM6DSO_OUTX_L_XL, g_spi_buffer, SPI_BURST_READ_LEN) !=
+	    0) {
+		result = ERROR_SPI_TIMEOUT;
+	} else {
+		g_system.accel_x =
+		    (s16)(((s16)g_spi_buffer[ARRAY_INDEX_ONE] << SHIFT_8_BITS) |
+		          (s16)g_spi_buffer[ARRAY_INDEX_ZERO]);
+		g_system.accel_y =
+		    (s16)(((s16)g_spi_buffer[ARRAY_INDEX_THREE] << SHIFT_8_BITS) |
+		          (s16)g_spi_buffer[ARRAY_INDEX_TWO]);
+		g_system.accel_z =
+		    (s16)(((s16)g_spi_buffer[ARRAY_INDEX_FIVE] << SHIFT_8_BITS) |
+		          (s16)g_spi_buffer[ARRAY_INDEX_FOUR]);
+	}
+
+	return result;
+}
+
 // Helper function to change state safely
 static void set_state(const State_t new_state) {
 	__disable_irq();
@@ -252,24 +284,21 @@ static void handle_read_state(void) {
 		return;
 	}
 
-	if ((status & LSM6DSO_STATUS_GDA) == 0U) {
+	if ((status & (LSM6DSO_STATUS_GDA | LSM6DSO_STATUS_XLDA)) == 0U) {
 		set_state(STATE_IDLE);
 		return;
 	}
 
-	if (read_gyro_data() != ERROR_NONE) {
+	ErrorCode_t r1 = read_gyro_data();
+	ErrorCode_t r2 = read_accel_data();
+	if ((r1 != ERROR_NONE) || (r2 != ERROR_NONE)) {
 		set_state(STATE_ERROR);
 	} else {
 		set_state(STATE_PROCESS);
 	}
 }
 
-static void handle_process_state(void) {
-	// Convert raw LSB to dps with FS=2000 dps: 0.07 dps/LSB -> dps*100 = raw*7
-	s32 x100 = (s32)g_system.gyro_x * (s32)LSM6DSO_GYRO_DPSx100_PER_LSB;
-	s32 y100 = (s32)g_system.gyro_y * (s32)LSM6DSO_GYRO_DPSx100_PER_LSB;
-	s32 z100 = (s32)g_system.gyro_z * (s32)LSM6DSO_GYRO_DPSx100_PER_LSB;
-
+static bool format_gyro_text(s32 x100, s32 y100, s32 z100) {
 	char sx = (x100 < 0) ? '-' : '+';
 	char sy = (y100 < 0) ? '-' : '+';
 	char sz = (z100 < 0) ? '-' : '+';
@@ -288,8 +317,108 @@ static void handle_process_state(void) {
 	             (unsigned long)xi, (unsigned long)xf, sy, (unsigned long)yi,
 	             (unsigned long)yf, sz, (unsigned long)zi, (unsigned long)zf);
 
-	if ((snprintf_result > 0) &&
-	    ((size_t)snprintf_result < sizeof(g_format_buffer))) {
+	return ((snprintf_result > 0) &&
+	        ((size_t)snprintf_result < sizeof(g_format_buffer)));
+}
+
+static bool format_gyro_csv(s32 x100, s32 y100, s32 z100) {
+	char sx = (x100 < 0) ? '-' : '+';
+	char sy = (y100 < 0) ? '-' : '+';
+	char sz = (z100 < 0) ? '-' : '+';
+
+	u32 xabs = (u32)((x100 < 0) ? -x100 : x100);
+	u32 yabs = (u32)((y100 < 0) ? -y100 : y100);
+	u32 zabs = (u32)((z100 < 0) ? -z100 : z100);
+
+	u32 xi = xabs / 100U, xf = xabs % 100U;
+	u32 yi = yabs / 100U, yf = yabs % 100U;
+	u32 zi = zabs / 100U, zf = zabs % 100U;
+
+	const int snprintf_result =
+	    snprintf(g_format_buffer, sizeof(g_format_buffer),
+	             "%c%lu.%02lu,%c%lu.%02lu,%c%lu.%02lu\r\n", sx, (unsigned long)xi,
+	             (unsigned long)xf, sy, (unsigned long)yi, (unsigned long)yf, sz,
+	             (unsigned long)zi, (unsigned long)zf);
+
+	return ((snprintf_result > 0) &&
+	        ((size_t)snprintf_result < sizeof(g_format_buffer)));
+}
+
+static bool format_imu_csv(s32 gx100, s32 gy100, s32 gz100, s32 ax_mg,
+                           s32 ay_mg, s32 az_mg) {
+	char sgx = (gx100 < 0) ? '-' : '+';
+	char sgy = (gy100 < 0) ? '-' : '+';
+	char sgz = (gz100 < 0) ? '-' : '+';
+
+	u32 gxabs = (u32)((gx100 < 0) ? -gx100 : gx100);
+	u32 gyabs = (u32)((gy100 < 0) ? -gy100 : gy100);
+	u32 gzabs = (u32)((gz100 < 0) ? -gz100 : gz100);
+
+	u32 gxi = gxabs / 100U, gxf = gxabs % 100U;
+	u32 gyi = gyabs / 100U, gyf = gyabs % 100U;
+	u32 gzi = gzabs / 100U, gzf = gzabs % 100U;
+
+	char sax = (ax_mg < 0) ? '-' : '+';
+	char say = (ay_mg < 0) ? '-' : '+';
+	char saz = (az_mg < 0) ? '-' : '+';
+
+	u32 axabs = (u32)((ax_mg < 0) ? -ax_mg : ax_mg);
+	u32 ayabs = (u32)((ay_mg < 0) ? -ay_mg : ay_mg);
+	u32 azabs = (u32)((az_mg < 0) ? -az_mg : az_mg);
+
+	u32 axi = axabs / 1000U, axf = axabs % 1000U;
+	u32 ayi = ayabs / 1000U, ayf = ayabs % 1000U;
+	u32 azi = azabs / 1000U, azf = azabs % 1000U;
+
+	const int snprintf_result = snprintf(
+	    g_format_buffer, sizeof(g_format_buffer),
+	    "%c%lu.%02lu,%c%lu.%02lu,%c%lu.%02lu,%c%lu.%03lu,%c%lu.%03lu,%c%lu.%"
+	    "03lu\r\n",
+	    sgx, (unsigned long)gxi, (unsigned long)gxf, sgy, (unsigned long)gyi,
+	    (unsigned long)gyf, sgz, (unsigned long)gzi, (unsigned long)gzf, sax,
+	    (unsigned long)axi, (unsigned long)axf, say, (unsigned long)ayi,
+	    (unsigned long)ayf, saz, (unsigned long)azi, (unsigned long)azf);
+
+	return ((snprintf_result > 0) &&
+	        ((size_t)snprintf_result < sizeof(g_format_buffer)));
+}
+
+static void print_csv_header_once(void) {
+	static bool header_printed = false;
+	if (!header_printed) {
+		const int snprintf_result =
+		    snprintf(g_format_buffer, sizeof(g_format_buffer),
+		             "gx_dps,gy_dps,gz_dps,ax_g,ay_g,az_g\r\n");
+		if ((snprintf_result > 0) &&
+		    ((size_t)snprintf_result < sizeof(g_format_buffer))) {
+			uart_puts(g_format_buffer);
+		}
+		header_printed = true;
+	}
+}
+
+static void handle_process_state(void) {
+	// Convert raw LSB to dps with FS=2000 dps: 0.07 dps/LSB -> dps*100 = raw*7
+	s32 x100 = (s32)g_system.gyro_x * (s32)LSM6DSO_GYRO_DPSx100_PER_LSB;
+	s32 y100 = (s32)g_system.gyro_y * (s32)LSM6DSO_GYRO_DPSx100_PER_LSB;
+	s32 z100 = (s32)g_system.gyro_z * (s32)LSM6DSO_GYRO_DPSx100_PER_LSB;
+
+	bool ok;
+#if OUTPUT_FORMAT_CSV
+	print_csv_header_once();
+	s32 ax_uG = (s32)g_system.accel_x * LSM6DSO_ACC_mg_X1000_PER_LSB; // micro-g
+	s32 ay_uG = (s32)g_system.accel_y * LSM6DSO_ACC_mg_X1000_PER_LSB;
+	s32 az_uG = (s32)g_system.accel_z * LSM6DSO_ACC_mg_X1000_PER_LSB;
+	// Convert micro-g to g*1000 with sign-aware rounding: g*1000 = (uG)/1000
+	s32 ax_gx1000 = (ax_uG >= 0) ? ((ax_uG + 500) / 1000) : ((ax_uG - 500) / 1000);
+	s32 ay_gx1000 = (ay_uG >= 0) ? ((ay_uG + 500) / 1000) : ((ay_uG - 500) / 1000);
+	s32 az_gx1000 = (az_uG >= 0) ? ((az_uG + 500) / 1000) : ((az_uG - 500) / 1000);
+	ok = format_imu_csv(x100, y100, z100, ax_gx1000, ay_gx1000, az_gx1000);
+#else
+	ok = format_gyro_text(x100, y100, z100);
+#endif
+
+	if (ok) {
 		set_state(STATE_OUTPUT);
 	} else {
 		set_state(STATE_ERROR);
