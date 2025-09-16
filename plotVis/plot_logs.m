@@ -5,7 +5,6 @@ clear all; close all; clc;
 FS = NaN;
 WINDOW_SEC = 2;
 
-% Plot toggles
 PLOT_TS       = true;   % Time series for gyro/accel with smoothing
 PLOT_MAG      = true;   % Magnitudes |g| and |a|
 PLOT_2D_ACCEL = true;   % 2D projection ax-ay
@@ -35,6 +34,15 @@ if isempty(csvNames)
   error("Нет файлов .csv в папке %s", logdir);
 endif
 
+% Загрузка смещения (калибровки) гироскопа один раз для всех графиков
+bias_x = 0; bias_y = 0; bias_z = 0;
+try
+  [bias_x, bias_y, bias_z] = compute_gyro_bias();
+  printf("Используется калибровка гироскопа: [%.6f %.6f %.6f] dps\n", bias_x, bias_y, bias_z);
+catch
+  warning("Не удалось загрузить калибровку гироскопа. Смещения будут нулевыми.");
+end_try_catch
+
 for k = 1:numel(csvNames)
   fname = fullfile(logdir, csvNames{k});
   printf("Загружаю %s ...\n", csvNames{k});
@@ -45,25 +53,26 @@ for k = 1:numel(csvNames)
   gx  = data(:,2); gy = data(:,3); gz = data(:,4);
   ax  = data(:,5); ay = data(:,6); az = data(:,7);
 
-  % Time/index axis and smoothing window
+  % Применяем калибровку гироскопа (вычитаем смещения)
+  gx = gx - bias_x;
+  gy = gy - bias_y;
+  gz = gz - bias_z;
+
   if isfinite(FS) && FS > 0
-    t = (idx - idx(1)) / FS;       % seconds
+    t = (idx - idx(1)) / FS;
     xLabelTS = "Time [s]";
     winN = max(1, round(WINDOW_SEC * FS));
   else
-    t = idx;                       % index used as x-axis
+    t = idx;
     xLabelTS = "Index";
-    winN = 101;                    % default sample-based window
+    winN = 101;
   endif
 
-  % Simple moving average smoother
   smooth = @(x,n) filter(ones(1,n)/n, 1, x);
 
-  % Magnitudes
   gm = sqrt(gx.^2 + gy.^2 + gz.^2);
   am = sqrt(ax.^2 + ay.^2 + az.^2);
 
-  % Time series with smoothing overlays
   if PLOT_TS
     figure("name", ["Gyro time series: " csvNames{k}]);
     subplot(3,1,1); hold on; plot(t, gx, "-"); plot(t, smooth(gx, winN), "-", "LineWidth", 1.2); grid on; ylabel("gx [dps]"); title(["Gyro time series: " csvNames{k}]); legend("raw","mean");
@@ -76,14 +85,12 @@ for k = 1:numel(csvNames)
     subplot(3,1,3); hold on; plot(t, az, "-"); plot(t, smooth(az, winN), "-", "LineWidth", 1.2); grid on; ylabel("az [g]"); xlabel(xLabelTS); legend("raw","mean");
   endif
 
-  % Magnitudes |g| and |a|
   if PLOT_MAG
     figure("name", ["Magnitudes: " csvNames{k}]);
     subplot(2,1,1); hold on; plot(t, gm, "-"); plot(t, smooth(gm, winN), "-", "LineWidth", 1.2); grid on; ylabel("|g| [dps]"); title(["Magnitudes: " csvNames{k}]); legend("raw","mean");
     subplot(2,1,2); hold on; plot(t, am, "-"); plot(t, smooth(am, winN), "-", "LineWidth", 1.2); grid on; ylabel("|a| [g]"); xlabel(xLabelTS); legend("raw","mean");
   endif
 
-  % 2D projections (accelerometer by default)
   if PLOT_2D_ACCEL
     figure("name", ["Accel 2D projection (ax-ay): " csvNames{k}]);
     plot(ax, ay, "-"); grid on; axis equal; xlabel("ax [g]"); ylabel("ay [g]"); title(["Accel ax-ay: " csvNames{k}]);
@@ -96,7 +103,6 @@ for k = 1:numel(csvNames)
     subplot(1,3,3); plot(gz, gx, "-"); grid on; xlabel("gz [dps]"); ylabel("gx [dps]"); title("gz-gx"); axis equal;
   endif
 
-  % 3D trajectories (optional, colored by index/time)
   if PLOT_3D_ACCEL
     figure("name", ["Accelerometer 3D: " csvNames{k}]);
     scatter3(ax, ay, az, 6, t, "filled"); grid on; axis equal; xlabel("ax [g]"); ylabel("ay [g]"); zlabel("az [g]");
@@ -109,7 +115,6 @@ for k = 1:numel(csvNames)
     title(["Gyroscope 3D trajectory: " csvNames{k}]); colorbar; colormap jet;
   endif
 
-  % Histograms (Octave-compatible)
   if PLOT_HIST
     figure("name", ["Gyro histograms: " csvNames{k}]);
     subplot(3,1,1);
@@ -164,7 +169,6 @@ for k = 1:numel(csvNames)
     grid on; ylabel("az"); xlabel("Value [g]");
   endif
 
-  % PSD / Periodogram (robust fallback without signal package)
   if PLOT_PSD
     [fgx, Pgx, fLabel] = simple_psd(gx, FS);
     [fgy, Pgy, ~]      = simple_psd(gy, FS);
@@ -223,8 +227,6 @@ function [f, pxx, fLabel] = simple_psd(x, Fs)
 endfunction
 
 function plot_hist_compat(x, nbins)
-  % Plot histogram in Matlab/Octave-compatible way
-  % Uses "histogram" if available, otherwise falls back to hist()+bar()
   if exist("histogram", "file") == 2
     histogram(x, nbins);
   else
