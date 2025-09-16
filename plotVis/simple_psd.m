@@ -23,7 +23,6 @@ function [f, pxx, fLabel] = simple_psd(x, Fs)
     return;
   endif
 
-  % Window (Hann). Use builtin if available; otherwise manual.
   if exist("hann", "file") == 2
     w = hann(n);
   else
