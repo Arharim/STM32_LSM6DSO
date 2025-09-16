@@ -410,9 +410,12 @@ static void handle_process_state(void) {
 	s32 ay_uG = (s32)g_system.accel_y * LSM6DSO_ACC_mg_X1000_PER_LSB;
 	s32 az_uG = (s32)g_system.accel_z * LSM6DSO_ACC_mg_X1000_PER_LSB;
 	// Convert micro-g to g*1000 with sign-aware rounding: g*1000 = (uG)/1000
-	s32 ax_gx1000 = (ax_uG >= 0) ? ((ax_uG + 500) / 1000) : ((ax_uG - 500) / 1000);
-	s32 ay_gx1000 = (ay_uG >= 0) ? ((ay_uG + 500) / 1000) : ((ay_uG - 500) / 1000);
-	s32 az_gx1000 = (az_uG >= 0) ? ((az_uG + 500) / 1000) : ((az_uG - 500) / 1000);
+	s32 ax_gx1000 =
+	    (ax_uG >= 0) ? ((ax_uG + 500) / 1000) : ((ax_uG - 500) / 1000);
+	s32 ay_gx1000 =
+	    (ay_uG >= 0) ? ((ay_uG + 500) / 1000) : ((ay_uG - 500) / 1000);
+	s32 az_gx1000 =
+	    (az_uG >= 0) ? ((az_uG + 500) / 1000) : ((az_uG - 500) / 1000);
 	ok = format_imu_csv(x100, y100, z100, ax_gx1000, ay_gx1000, az_gx1000);
 #else
 	ok = format_gyro_text(x100, y100, z100);
