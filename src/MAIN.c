@@ -223,10 +223,10 @@ static void handle_init_state(void) {
 	init_uart();
 	init_timer();
 
-	// Configure LSM6DSO: Gyroscope + Accelerometer with HPF to remove gravity
+	// Configure LSM6DSO: Gyroscope + Accelerometer without HPF to preserve gravity
 	if ((spi_write(LSM6DSO_CTRL2_G, LSM6DSO_GYRO_208HZ_2000DPS) != 0) ||
 	    (spi_write(LSM6DSO_CTRL1_XL, LSM6DSO_ACC_208HZ_2G) != 0) ||
-	    (spi_write(LSM6DSO_CTRL8_XL, LSM6DSO_XL_HP_EN) != 0) ||
+	    (spi_write(LSM6DSO_CTRL8_XL, 0x00U) != 0) ||
 	    (spi_write(LSM6DSO_CTRL3_C, (LSM6DSO_BDU_ENABLE | 0x04U)) != 0)) {
 		set_state(STATE_ERROR);
 		return;
