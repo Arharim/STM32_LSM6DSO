@@ -4,9 +4,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 
-from ..config import config
-from ..utils.io import read_imu_csv
-from ..calibration import (
+from config import config
+from utils.io import read_imu_csv
+from calibration import (
     AccelCalibration,
     GyroCalibration,
     load_accel_calibration,
@@ -14,7 +14,7 @@ from ..calibration import (
     apply_gyro_bias,
     compute_gyro_bias,
 )
-from .psd import simple_psd
+from visualization.psd import simple_psd
 
 
 def plot_time_series(
@@ -213,6 +213,10 @@ def plot_logs(
         plot_types: List of plot types to generate. Options:
             ["ts", "mag", "hist", "psd", "2d", "3d_accel", "3d_gyro"]
     """
+    import matplotlib
+
+    matplotlib.use("Agg")
+
     logs_dir = Path(logs_dir) if logs_dir else config.LOGS_DIR
 
     if not logs_dir.exists():

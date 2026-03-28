@@ -6,6 +6,8 @@ from .calibration import (
     load_accel_calibration,
     apply_accel_calibration,
     apply_gyro_bias,
+    save_calibration,
+    evaluate_calibration_quality,
 )
 
 __all__ = [
@@ -16,4 +18,6 @@ __all__ = [
     "load_accel_calibration",
     "apply_accel_calibration",
     "apply_gyro_bias",
+    "save_calibration",
+    "evaluate_calibration_quality",
 ]

@@ -3,8 +3,8 @@ from typing import Tuple, Optional
 import numpy as np
 from pathlib import Path
 
-from ..config import config
-from ..utils.io import (
+from config import config
+from utils.io import (
     read_imu_csv,
     save_calibration_coefficients,
     load_calibration_coefficients,
