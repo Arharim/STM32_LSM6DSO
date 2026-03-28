@@ -14,7 +14,7 @@ from calibration import (
     apply_gyro_bias,
     compute_gyro_bias,
 )
-from visualization.psd import simple_psd
+from .psd import simple_psd
 
 
 def plot_time_series(
