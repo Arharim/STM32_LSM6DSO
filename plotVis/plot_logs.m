@@ -34,13 +34,26 @@ if isempty(csvNames)
   error("Нет файлов .csv в папке %s", logdir);
 endif
 
-% Загрузка смещения (калибровки) гироскопа один раз для всех графиков
-bias_x = 0; bias_y = 0; bias_z = 0;
+% Загрузка калибровки гироскопа один раз для всех графиков
+gyro_bias_x = 0; gyro_bias_y = 0; gyro_bias_z = 0;
 try
-  [bias_x, bias_y, bias_z] = compute_gyro_bias();
-  printf("Используется калибровка гироскопа: [%.6f %.6f %.6f] dps\n", bias_x, bias_y, bias_z);
+  [gyro_bias_x, gyro_bias_y, gyro_bias_z] = compute_gyro_bias();
+  printf("Используется калибровка гироскопа: [%.6f %.6f %.6f] dps\n", gyro_bias_x, gyro_bias_y, gyro_bias_z);
 catch
   warning("Не удалось загрузить калибровку гироскопа. Смещения будут нулевыми.");
+end_try_catch
+
+% Загрузка калибровки акселерометра один раз для всех графиков
+accel_bias_x = 0; accel_scale_x = 1; 
+accel_bias_y = 0; accel_scale_y = 1; 
+accel_bias_z = 0; accel_scale_z = 1;
+try
+  [accel_bias_x, accel_scale_x, accel_bias_y, accel_scale_y, accel_bias_z, accel_scale_z] = compute_accel_calibration();
+  printf("Используется калибровка акселерометра:\n");
+  printf("  Bias:  [%.6f %.6f %.6f] g\n", accel_bias_x, accel_bias_y, accel_bias_z);
+  printf("  Scale: [%.6f %.6f %.6f]\n", accel_scale_x, accel_scale_y, accel_scale_z);
+catch
+  warning("Не удалось загрузить калибровку акселерометра. Будут использованы значения по умолчанию.");
 end_try_catch
 
 for k = 1:numel(csvNames)
@@ -54,9 +67,14 @@ for k = 1:numel(csvNames)
   ax  = data(:,5); ay = data(:,6); az = data(:,7);
 
   % Применяем калибровку гироскопа (вычитаем смещения)
-  gx = gx - bias_x;
-  gy = gy - bias_y;
-  gz = gz - bias_z;
+  gx = gx - gyro_bias_x;
+  gy = gy - gyro_bias_y;
+  gz = gz - gyro_bias_z;
+  
+  % Применяем калибровку акселерометра (смещение и масштаб)
+  ax = (ax - accel_bias_x) * accel_scale_x;
+  ay = (ay - accel_bias_y) * accel_scale_y;
+  az = (az - accel_bias_z) * accel_scale_z;
 
   if isfinite(FS) && FS > 0
     t = (idx - idx(1)) / FS;
