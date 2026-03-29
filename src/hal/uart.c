@@ -9,8 +9,8 @@
 
 static volatile struct {
 	char buffer[UART_TX_BUFFER_SIZE];
-	volatile uint16_t write_idx;
-	volatile uint16_t read_idx;
+	volatile u16 write_idx;
+	volatile u16 read_idx;
 } g_uart_tx = {{0}, 0U, 0U};
 
 static bool g_uart_initialized = false;
@@ -41,13 +41,13 @@ void uart_init(void) {
 
 	USART1->CR1 |= USART_CR1_UE;
 
-	uint32_t timeout = 1000U;
+	u32 timeout = 1000U;
 	while (((USART1->SR & USART_SR_TC) == 0U) && (timeout > 0U)) {
 		timeout--;
 		__NOP();
 	}
 
-	volatile uint32_t dummy_sr = USART1->SR;
+	volatile u32 dummy_sr = USART1->SR;
 	USART1->DR = UART_DUMMY_BYTE;
 	(void)dummy_sr;
 
@@ -73,7 +73,7 @@ uart_status_t uart_puts_safe(const char *const s) {
 	__disable_irq();
 
 	while (*str_ptr != '\0') {
-		const uint16_t next_idx = (g_uart_tx.write_idx + 1U) % UART_TX_BUFFER_SIZE;
+		const u16 next_idx = (g_uart_tx.write_idx + 1U) % UART_TX_BUFFER_SIZE;
 
 		if (next_idx == g_uart_tx.read_idx) {
 			chars_lost++;
@@ -104,9 +104,9 @@ void uart_deinit(void) {
 }
 
 void uart_clear_errors(void) {
-	const uint32_t sr = USART1->SR;
+	const u32 sr = USART1->SR;
 	if ((sr & (USART_SR_ORE | USART_SR_NE | USART_SR_FE | USART_SR_PE)) != 0U) {
-		volatile uint32_t dummy = USART1->DR;
+		volatile u32 dummy = USART1->DR;
 		(void)dummy;
 	}
 }
@@ -127,11 +127,11 @@ void uart_debug_printf(const char *fmt, ...) {
 #endif
 
 void USART1_IRQHandler(void) {
-	const uint32_t sr = USART1->SR;
+	const u32 sr = USART1->SR;
 
 	if (((USART1->CR1 & USART_CR1_TXEIE) != 0U) && ((sr & USART_SR_TXE) != 0U)) {
 		if (g_uart_tx.read_idx != g_uart_tx.write_idx) {
-			USART1->DR = (uint16_t)g_uart_tx.buffer[g_uart_tx.read_idx];
+			USART1->DR = (u16)g_uart_tx.buffer[g_uart_tx.read_idx];
 			g_uart_tx.read_idx = (g_uart_tx.read_idx + 1U) % UART_TX_BUFFER_SIZE;
 		} else {
 			USART1->CR1 &= ~USART_CR1_TXEIE;
@@ -139,12 +139,12 @@ void USART1_IRQHandler(void) {
 	}
 
 	if ((sr & (USART_SR_ORE | USART_SR_NE | USART_SR_FE | USART_SR_PE)) != 0U) {
-		volatile uint32_t dummy = USART1->DR;
+		volatile u32 dummy = USART1->DR;
 		(void)dummy;
 	}
 
 	if ((sr & USART_SR_RXNE) != 0U) {
-		volatile uint8_t received_data = (uint8_t)USART1->DR;
+		volatile u8 received_data = (u8)USART1->DR;
 		(void)received_data;
 	}
 }

@@ -18,7 +18,7 @@ clock_status_t clock_init(void) {
 	RCC->CIR = 0x00000000UL;
 
 	RCC->CR |= RCC_CR_HSEON;
-	uint32_t timeout = HSE_STARTUP_TIMEOUT;
+	u32 timeout = HSE_STARTUP_TIMEOUT;
 	while (((RCC->CR & RCC_CR_HSERDY) == 0U) && (timeout > 0U)) {
 		timeout--;
 	}

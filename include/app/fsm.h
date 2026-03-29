@@ -13,9 +13,9 @@
 #ifndef APP_FSM_H
 #define APP_FSM_H
 
+#include "config.h"
 #include "drivers/lsm6dso.h"
 #include <stdbool.h>
-#include <stdint.h>
 
 /**
  * @brief FSM state enumeration
@@ -36,9 +36,9 @@ typedef enum {
 typedef struct {
 	volatile fsm_state_t current_state; /**< Current FSM state */
 	lsm6dso_data_t sensor_data;         /**< Latest sensor data */
-	uint8_t retry_count;                /**< ID check retry counter */
-	uint32_t stabilization_start;       /**< Stabilization start timestamp */
-	uint32_t last_retry_time;           /**< Last ID check timestamp */
+	u8 retry_count;                     /**< ID check retry counter */
+	u32 stabilization_start;            /**< Stabilization start timestamp */
+	u32 last_retry_time;                /**< Last ID check timestamp */
 } fsm_context_t;
 
 /**

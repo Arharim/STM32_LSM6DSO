@@ -10,7 +10,7 @@ static bool g_spi_initialized = false;
 
 static void spi_clear_rx_buffer(void) {
 	while ((SPI1->SR & SPI_SR_RXNE) != 0U) {
-		volatile uint8_t dummy = (uint8_t)SPI1->DR;
+		volatile u8 dummy = (u8)SPI1->DR;
 		(void)dummy;
 	}
 }
@@ -35,13 +35,13 @@ void spi_init(void) {
 
 	SPI1->CR2 = 0UL;
 
-	volatile uint32_t dummy = SPI1->DR;
+	volatile u32 dummy = SPI1->DR;
 	dummy = SPI1->SR;
 	(void)dummy;
 
 	SPI1->CR1 |= SPI_CR1_SPE;
 
-	uint32_t timeout = 1000UL;
+	u32 timeout = 1000UL;
 	while (((SPI1->CR1 & SPI_CR1_SPE) == 0U) && (timeout > 0U)) {
 		timeout--;
 		__NOP();
@@ -61,8 +61,8 @@ void spi_cs_high(void) { GPIOA->BSRR = BIT_MASK(SPI_CS_PIN); }
 
 void spi_cs_low(void) { GPIOA->BSRR = (BIT_MASK(SPI_CS_PIN) << 16U); }
 
-spi_status_t spi_write_byte(uint8_t reg, uint8_t data) {
-	uint32_t timeout;
+spi_status_t spi_write_byte(u8 reg, u8 data) {
+	u32 timeout;
 
 	spi_clear_rx_buffer();
 	spi_cs_low();
@@ -75,7 +75,7 @@ spi_status_t spi_write_byte(uint8_t reg, uint8_t data) {
 		spi_cs_high();
 		return SPI_ERR_TIMEOUT;
 	}
-	SPI1->DR = (uint16_t)reg;
+	SPI1->DR = (u16)reg;
 
 	timeout = SPI_TIMEOUT_MS;
 	while (((SPI1->SR & SPI_SR_RXNE) == 0U) && (timeout > 0U)) {
@@ -86,7 +86,7 @@ spi_status_t spi_write_byte(uint8_t reg, uint8_t data) {
 		spi_cs_high();
 		return SPI_ERR_TIMEOUT;
 	}
-	volatile uint8_t dummy1 = (uint8_t)SPI1->DR;
+	volatile u8 dummy1 = (u8)SPI1->DR;
 	(void)dummy1;
 
 	timeout = SPI_TIMEOUT_MS;
@@ -98,7 +98,7 @@ spi_status_t spi_write_byte(uint8_t reg, uint8_t data) {
 		spi_cs_high();
 		return SPI_ERR_TIMEOUT;
 	}
-	SPI1->DR = (uint16_t)data;
+	SPI1->DR = (u16)data;
 
 	timeout = SPI_TIMEOUT_MS;
 	while (((SPI1->SR & SPI_SR_RXNE) == 0U) && (timeout > 0U)) {
@@ -109,7 +109,7 @@ spi_status_t spi_write_byte(uint8_t reg, uint8_t data) {
 		spi_cs_high();
 		return SPI_ERR_TIMEOUT;
 	}
-	volatile uint8_t dummy2 = (uint8_t)SPI1->DR;
+	volatile u8 dummy2 = (u8)SPI1->DR;
 	(void)dummy2;
 
 	timeout = SPI_TIMEOUT_MS;
@@ -131,8 +131,8 @@ spi_status_t spi_write_byte(uint8_t reg, uint8_t data) {
 	return SPI_OK;
 }
 
-spi_status_t spi_read_byte(uint8_t reg, uint8_t *data) {
-	uint32_t timeout;
+spi_status_t spi_read_byte(u8 reg, u8 *data) {
+	u32 timeout;
 
 	if (data == NULL) {
 		return SPI_ERR_PARAM;
@@ -149,7 +149,7 @@ spi_status_t spi_read_byte(uint8_t reg, uint8_t *data) {
 		spi_cs_high();
 		return SPI_ERR_TIMEOUT;
 	}
-	SPI1->DR = (uint16_t)(reg | 0x80U);
+	SPI1->DR = (u16)(reg | 0x80U);
 
 	timeout = SPI_TIMEOUT_MS;
 	while (((SPI1->SR & SPI_SR_RXNE) == 0U) && (timeout > 0U)) {
@@ -169,7 +169,7 @@ spi_status_t spi_read_byte(uint8_t reg, uint8_t *data) {
 		spi_cs_high();
 		return SPI_ERR_TIMEOUT;
 	}
-	SPI1->DR = (uint16_t)SPI_DUMMY_BYTE;
+	SPI1->DR = (u16)SPI_DUMMY_BYTE;
 
 	timeout = SPI_TIMEOUT_MS;
 	while (((SPI1->SR & SPI_SR_RXNE) == 0U) && (timeout > 0U)) {
@@ -179,7 +179,7 @@ spi_status_t spi_read_byte(uint8_t reg, uint8_t *data) {
 		spi_cs_high();
 		return SPI_ERR_TIMEOUT;
 	}
-	*data = (uint8_t)SPI1->DR;
+	*data = (u8)SPI1->DR;
 
 	timeout = SPI_TIMEOUT_MS;
 	while (((SPI1->SR & SPI_SR_BSY) != 0U) && (timeout > 0U)) {
@@ -195,8 +195,8 @@ spi_status_t spi_read_byte(uint8_t reg, uint8_t *data) {
 	return SPI_OK;
 }
 
-spi_status_t spi_read_burst(uint8_t reg, uint8_t *buffer, uint8_t len) {
-	uint32_t timeout;
+spi_status_t spi_read_burst(u8 reg, u8 *buffer, u8 len) {
+	u32 timeout;
 
 	if ((buffer == NULL) || (len == 0U)) {
 		return SPI_ERR_PARAM;
@@ -214,7 +214,7 @@ spi_status_t spi_read_burst(uint8_t reg, uint8_t *buffer, uint8_t len) {
 		spi_cs_high();
 		return SPI_ERR_TIMEOUT;
 	}
-	SPI1->DR = (uint16_t)(reg | 0x80U);
+	SPI1->DR = (u16)(reg | 0x80U);
 
 	timeout = SPI_TIMEOUT_MS;
 	while (((SPI1->SR & SPI_SR_RXNE) == 0U) && (timeout > 0U)) {
@@ -225,10 +225,10 @@ spi_status_t spi_read_burst(uint8_t reg, uint8_t *buffer, uint8_t len) {
 		spi_cs_high();
 		return SPI_ERR_TIMEOUT;
 	}
-	volatile uint8_t dummy = (uint8_t)SPI1->DR;
+	volatile u8 dummy = (u8)SPI1->DR;
 	(void)dummy;
 
-	for (uint8_t i = 0U; i < len; i++) {
+	for (u8 i = 0U; i < len; i++) {
 		timeout = SPI_TIMEOUT_MS;
 		while (((SPI1->SR & SPI_SR_TXE) == 0U) && (timeout > 0U)) {
 			timeout--;
@@ -238,7 +238,7 @@ spi_status_t spi_read_burst(uint8_t reg, uint8_t *buffer, uint8_t len) {
 			spi_cs_high();
 			return SPI_ERR_TIMEOUT;
 		}
-		SPI1->DR = (uint16_t)SPI_DUMMY_BYTE;
+		SPI1->DR = (u16)SPI_DUMMY_BYTE;
 
 		timeout = SPI_TIMEOUT_MS;
 		while (((SPI1->SR & SPI_SR_RXNE) == 0U) && (timeout > 0U)) {
@@ -249,7 +249,7 @@ spi_status_t spi_read_burst(uint8_t reg, uint8_t *buffer, uint8_t len) {
 			spi_cs_high();
 			return SPI_ERR_TIMEOUT;
 		}
-		buffer[i] = (uint8_t)SPI1->DR;
+		buffer[i] = (u8)SPI1->DR;
 	}
 
 	timeout = SPI_TIMEOUT_MS;

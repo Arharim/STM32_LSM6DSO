@@ -15,33 +15,33 @@ static char g_format_buffer[FORMAT_BUFFER_SIZE];
 static bool g_header_printed = false;
 static bool g_fsm_initialized = false;
 
-static void format_signed_value(int32_t value, uint32_t divisor, char *sign,
-                                uint32_t *int_part, uint32_t *frac_part) {
+static void format_signed_value(s32 value, u32 divisor, char *sign,
+                                u32 *int_part, u32 *frac_part) {
 	*sign = (value < 0) ? '-' : '+';
-	uint32_t abs_val = (uint32_t)((value < 0) ? -value : value);
+	u32 abs_val = (u32)((value < 0) ? -value : value);
 	*int_part = abs_val / divisor;
 	*frac_part = abs_val % divisor;
 }
 
 static bool format_imu_data(const lsm6dso_data_t *data) {
-	int32_t gx100 = (int32_t)data->gyro_x * LSM6DSO_GYRO_DPSx100_PER_LSB;
-	int32_t gy100 = (int32_t)data->gyro_y * LSM6DSO_GYRO_DPSx100_PER_LSB;
-	int32_t gz100 = (int32_t)data->gyro_z * LSM6DSO_GYRO_DPSx100_PER_LSB;
+	s32 gx100 = (s32)data->gyro_x * LSM6DSO_GYRO_DPSx100_PER_LSB;
+	s32 gy100 = (s32)data->gyro_y * LSM6DSO_GYRO_DPSx100_PER_LSB;
+	s32 gz100 = (s32)data->gyro_z * LSM6DSO_GYRO_DPSx100_PER_LSB;
 
-	int32_t ax_ug = (int32_t)data->accel_x * LSM6DSO_ACC_mg_X1000_PER_LSB;
-	int32_t ay_ug = (int32_t)data->accel_y * LSM6DSO_ACC_mg_X1000_PER_LSB;
-	int32_t az_ug = (int32_t)data->accel_z * LSM6DSO_ACC_mg_X1000_PER_LSB;
+	s32 ax_ug = (s32)data->accel_x * LSM6DSO_ACC_mg_X1000_PER_LSB;
+	s32 ay_ug = (s32)data->accel_y * LSM6DSO_ACC_mg_X1000_PER_LSB;
+	s32 az_ug = (s32)data->accel_z * LSM6DSO_ACC_mg_X1000_PER_LSB;
 
-	int32_t ax_gx1000 =
+	s32 ax_gx1000 =
 	    (ax_ug >= 0) ? ((ax_ug + 500) / 1000) : ((ax_ug - 500) / 1000);
-	int32_t ay_gx1000 =
+	s32 ay_gx1000 =
 	    (ay_ug >= 0) ? ((ay_ug + 500) / 1000) : ((ay_ug - 500) / 1000);
-	int32_t az_gx1000 =
+	s32 az_gx1000 =
 	    (az_ug >= 0) ? ((az_ug + 500) / 1000) : ((az_ug - 500) / 1000);
 
 	char sgx, sgy, sgz, sax, say, saz;
-	uint32_t gxi, gxf, gyi, gyf, gzi, gzf;
-	uint32_t axi, axf, ayi, ayf, azi, azf;
+	u32 gxi, gxf, gyi, gyf, gzi, gzf;
+	u32 axi, axf, ayi, ayf, azi, azf;
 
 	format_signed_value(gx100, 100U, &sgx, &gxi, &gxf);
 	format_signed_value(gy100, 100U, &sgy, &gyi, &gyf);
@@ -114,7 +114,7 @@ static void handle_init_state(void) {
 }
 
 static void handle_stabilizing_state(void) {
-	uint32_t current_tick = get_system_tick();
+	u32 current_tick = get_system_tick();
 
 	if ((current_tick - g_fsm.stabilization_start) < LSM6DSO_STABILIZATION_MS) {
 		return;
@@ -123,7 +123,7 @@ static void handle_stabilizing_state(void) {
 	if ((g_fsm.retry_count > 0U) &&
 	    ((current_tick - g_fsm.last_retry_time) >= LSM6DSO_RETRY_DELAY_MS)) {
 
-		uint8_t chip_id = 0U;
+		u8 chip_id = 0U;
 		lsm6dso_status_t status = lsm6dso_read_id(&chip_id);
 
 		if (status != LSM6DSO_OK) {

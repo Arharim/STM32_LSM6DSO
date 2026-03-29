@@ -7,8 +7,8 @@
 
 static bool g_lsm6dso_initialized = false;
 
-static int16_t combine_bytes(uint8_t lsb, uint8_t msb) {
-	return (int16_t)(((int16_t)msb << 8) | (int16_t)lsb);
+static s16 combine_bytes(u8 lsb, u8 msb) {
+	return (s16)(((s16)msb << 8) | (s16)lsb);
 }
 
 lsm6dso_status_t lsm6dso_init(void) {
@@ -42,7 +42,7 @@ lsm6dso_status_t lsm6dso_init(void) {
 	return LSM6DSO_OK;
 }
 
-lsm6dso_status_t lsm6dso_read_id(uint8_t *id) {
+lsm6dso_status_t lsm6dso_read_id(u8 *id) {
 	if (id == NULL) {
 		return LSM6DSO_ERR_SPI;
 	}
@@ -52,7 +52,7 @@ lsm6dso_status_t lsm6dso_read_id(uint8_t *id) {
 }
 
 bool lsm6dso_data_ready(void) {
-	uint8_t status = 0U;
+	u8 status = 0U;
 	spi_read_byte(LSM6DSO_STATUS_REG, &status);
 	return ((status & (LSM6DSO_STATUS_GDA | LSM6DSO_STATUS_XLDA)) != 0U);
 }
@@ -62,8 +62,8 @@ lsm6dso_status_t lsm6dso_read_data(lsm6dso_data_t *data) {
 		return LSM6DSO_ERR_SPI;
 	}
 
-	uint8_t gyro_buf[BURST_READ_LEN];
-	uint8_t accel_buf[BURST_READ_LEN];
+	u8 gyro_buf[BURST_READ_LEN];
+	u8 accel_buf[BURST_READ_LEN];
 
 	spi_status_t status =
 	    spi_read_burst(LSM6DSO_OUTX_L_G, gyro_buf, BURST_READ_LEN);

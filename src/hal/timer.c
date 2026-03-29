@@ -2,15 +2,15 @@
 #include "config.h"
 #include "stm32f10x.h"
 
-static volatile uint32_t g_system_tick = 0U;
+static volatile u32 g_system_tick = 0U;
 static bool g_timer_initialized = false;
 
 void timer_init(void) {
 	if (g_timer_initialized) {
 		return;
 	}
-	uint32_t timeout;
-	uint16_t initial_count;
+	u32 timeout;
+	u16 initial_count;
 
 	RCC->APB1RSTR |= (RCC_APB1RSTR_TIM2RST | RCC_APB1RSTR_TIM3RST);
 	RCC->APB1RSTR &= ~(RCC_APB1RSTR_TIM2RST | RCC_APB1RSTR_TIM3RST);
@@ -80,21 +80,21 @@ void timer_deinit(void) {
 	g_system_tick = 0U;
 }
 
-void delay_ms(uint32_t ms) {
-	uint32_t timeout;
+void delay_ms(u32 ms) {
+	u32 timeout;
 
 	if (ms == 0U) {
 		return;
 	}
 
-	if (!timer_is_running((uint32_t)TIM3)) {
-		for (volatile uint32_t i = 0U; i < (ms * (SYSTEM_CLOCK_HZ / 1000UL)); i++) {
+	if (!timer_is_running((u32)TIM3)) {
+		for (volatile u32 i = 0U; i < (ms * (SYSTEM_CLOCK_HZ / 1000UL)); i++) {
 			__NOP();
 		}
 		return;
 	}
 
-	for (uint32_t i = 0U; i < ms; i++) {
+	for (u32 i = 0U; i < ms; i++) {
 		TIM3->CNT = 0UL;
 
 		timeout = 10000U;
@@ -112,20 +112,20 @@ void delay_ms(uint32_t ms) {
 	}
 }
 
-uint32_t get_system_tick(void) {
-	uint32_t tick_value;
+u32 get_system_tick(void) {
+	u32 tick_value;
 	__disable_irq();
 	tick_value = g_system_tick;
 	__enable_irq();
 	return tick_value;
 }
 
-bool timer_is_running(uint32_t timer_base) {
+bool timer_is_running(u32 timer_base) {
 	bool is_running = false;
 
-	if (timer_base == (uint32_t)TIM2) {
+	if (timer_base == (u32)TIM2) {
 		is_running = ((TIM2->CR1 & TIM_CR1_CEN) != 0U);
-	} else if (timer_base == (uint32_t)TIM3) {
+	} else if (timer_base == (u32)TIM3) {
 		is_running = ((TIM3->CR1 & TIM_CR1_CEN) != 0U);
 	}
 

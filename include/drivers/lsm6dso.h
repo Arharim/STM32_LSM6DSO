@@ -10,8 +10,8 @@
 #ifndef DRIVERS_LSM6DSO_H
 #define DRIVERS_LSM6DSO_H
 
+#include "config.h"
 #include <stdbool.h>
-#include <stdint.h>
 
 /*============================================================================
  * Register Addresses
@@ -76,12 +76,12 @@
  * @brief Sensor data structure
  */
 typedef struct {
-	int16_t gyro_x;  /**< Gyroscope X-axis raw data */
-	int16_t gyro_y;  /**< Gyroscope Y-axis raw data */
-	int16_t gyro_z;  /**< Gyroscope Z-axis raw data */
-	int16_t accel_x; /**< Accelerometer X-axis raw data */
-	int16_t accel_y; /**< Accelerometer Y-axis raw data */
-	int16_t accel_z; /**< Accelerometer Z-axis raw data */
+	s16 gyro_x;  /**< Gyroscope X-axis raw data */
+	s16 gyro_y;  /**< Gyroscope Y-axis raw data */
+	s16 gyro_z;  /**< Gyroscope Z-axis raw data */
+	s16 accel_x; /**< Accelerometer X-axis raw data */
+	s16 accel_y; /**< Accelerometer Y-axis raw data */
+	s16 accel_z; /**< Accelerometer Z-axis raw data */
 } lsm6dso_data_t;
 
 /**
@@ -112,7 +112,7 @@ lsm6dso_status_t lsm6dso_init(void);
  * @param[out] id Pointer to store device ID
  * @return LSM6DSO_OK on success, error code on failure
  */
-lsm6dso_status_t lsm6dso_read_id(uint8_t *id);
+lsm6dso_status_t lsm6dso_read_id(u8 *id);
 
 /**
  * @brief Read all sensor data

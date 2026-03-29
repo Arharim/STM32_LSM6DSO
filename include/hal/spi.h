@@ -9,8 +9,8 @@
 #ifndef HAL_SPI_H
 #define HAL_SPI_H
 
+#include "config.h"
 #include <stdbool.h>
-#include <stdint.h>
 
 #define SPI_TIMEOUT_MS (1000U) /**< SPI operation timeout in milliseconds */
 #define SPI_DUMMY_BYTE (0xFFU) /**< Dummy byte for read operations */
@@ -60,7 +60,7 @@ void spi_cs_low(void);
  * @param data Data byte to write
  * @return SPI_OK on success, error code on failure
  */
-spi_status_t spi_write_byte(uint8_t reg, uint8_t data);
+spi_status_t spi_write_byte(u8 reg, u8 data);
 
 /**
  * @brief Read a single byte from SPI register
@@ -69,7 +69,7 @@ spi_status_t spi_write_byte(uint8_t reg, uint8_t data);
  * @param[out] data Pointer to store read data
  * @return SPI_OK on success, error code on failure
  */
-spi_status_t spi_read_byte(uint8_t reg, uint8_t *data);
+spi_status_t spi_read_byte(u8 reg, u8 *data);
 
 /**
  * @brief Read multiple bytes from SPI using burst mode
@@ -79,6 +79,6 @@ spi_status_t spi_read_byte(uint8_t reg, uint8_t *data);
  * @param len Number of bytes to read
  * @return SPI_OK on success, error code on failure
  */
-spi_status_t spi_read_burst(uint8_t reg, uint8_t *buffer, uint8_t len);
+spi_status_t spi_read_burst(u8 reg, u8 *buffer, u8 len);
 
 #endif

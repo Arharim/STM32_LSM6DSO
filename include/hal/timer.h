@@ -10,8 +10,8 @@
 #ifndef HAL_TIMER_H
 #define HAL_TIMER_H
 
+#include "config.h"
 #include <stdbool.h>
-#include <stdint.h>
 
 #define TIMER_CONFIG_TIMEOUT                                                   \
 	(10000U) /**< Timer configuration timeout in loops */
@@ -41,7 +41,7 @@ void timer_deinit(void);
  *
  * @param ms Delay duration in milliseconds
  */
-void delay_ms(uint32_t ms);
+void delay_ms(u32 ms);
 
 /**
  * @brief Get system tick counter
@@ -50,7 +50,7 @@ void delay_ms(uint32_t ms);
  *
  * @return System tick count in milliseconds
  */
-uint32_t get_system_tick(void);
+u32 get_system_tick(void);
 
 /**
  * @brief Check if a timer is running
@@ -58,6 +58,6 @@ uint32_t get_system_tick(void);
  * @param timer_base Timer base address (TIM2 or TIM3)
  * @return true if timer is enabled, false otherwise
  */
-bool timer_is_running(uint32_t timer_base);
+bool timer_is_running(u32 timer_base);
 
 #endif
