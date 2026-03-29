@@ -29,7 +29,7 @@ typedef enum {
  *
  * @return CLOCK_OK on success, error code on failure
  *
- * @note Enables clocks for GPIOA, SPI1, USART2, TIM2, TIM3
+ * @note Enables clocks for GPIOA, SPI1, USART2, TIM1, TIM2, TIM3, TIM4
  */
 clock_status_t clock_init(void);
 

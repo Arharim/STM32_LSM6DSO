@@ -16,13 +16,14 @@ Bare-metal STM32F103 (Blue Pill) firmware using CMSIS and direct register access
 - TIM2 generates 100 Hz "tick" for sampling; TIM3 used for delays
 - SysTick 1 ms system tick
 - UART2 115200 8N1 output of "X: Y: Z:" lines
+- PWM generation for 6 servo motors (50 Hz, 1-2 ms pulse)
 - Error handling with HSE/PLL fallback to HSI
 
 ## Hardware
 - MCU: STM32F103C8T6 (Blue Pill)
 - IMU: ST LSM6DSO (STEVAL-MKI196V1) (tested with WHO_AM_I = 0x6C)
 
-Recommended wiring (SPI1 and UART2):
+Recommended wiring (SPI1, UART2, PWM):
 - PA4  -> LSM6DSO CS (active low)
 - PA5  -> LSM6DSO SCK
 - PA6  -> LSM6DSO MISO
@@ -31,10 +32,13 @@ Recommended wiring (SPI1 and UART2):
 - GND  -> LSM6DSO GND
 - PA2 (USART2 TX)  -> USB-UART RX (host)
 - PA3 (USART2 RX) -> USB-UART TX (host) [optional]
+- PA8-PA11      -> Servo 1-4 signal (TIM1 PWM)
+- PB6-PB7        -> Servo 5-6 signal (TIM4 PWM)
 
 Notes:
 - SPI mode is 3; ensure the IMU board supports 3.3V logic.
 - Default SPI clock ≈ APB2/16; with SYSCLK=24 MHz, SPI ≈ 1.5 MHz.
+- PWM servos: 50 Hz, pulse 1-2 ms for 0-180°.
 
 ## Build and Flash
 Requirements:
@@ -62,6 +66,7 @@ include/
 │   ├── clock.h           # RCC, PLL configuration
 │   ├── gpio.h            # GPIO initialization
 │   ├── gpio_config.h     # GPIO pin definitions
+│   ├── pwm.h             # PWM driver for servos
 │   ├── spi.h             # SPI driver
 │   ├── timer.h           # SysTick, TIM2, TIM3
 │   └── uart.h            # UART with TX buffer
@@ -75,6 +80,7 @@ src/
 ├── hal/
 │   ├── clock.c           # Clock implementation
 │   ├── gpio.c            # GPIO implementation
+│   ├── pwm.c             # PWM implementation
 │   ├── spi.c             # SPI implementation
 │   ├── timer.c           # Timer implementation
 │   └── uart.c            # UART implementation
@@ -93,7 +99,7 @@ src/
 clock_status_t clock_init(void);  // Initialize system clock, returns CLOCK_OK or error
 ```
 - On HSE/PLL error, falls back to HSI and returns error code
-- Enables clocks for GPIOA, SPI1, USART2, TIM2, TIM3
+ - Enables clocks for GPIOA, SPI1, USART2, TIM1, TIM2, TIM3, TIM4
 
 #### GPIO (`hal/gpio.h`)
 ```c
@@ -138,6 +144,19 @@ bool timer_is_running(uint32_t timer_base);
 - TIM2: 100Hz sample timer
 - TIM3: 1kHz delay timer
 
+#### PWM (`hal/pwm.h`)
+```c
+void pwm_init(void);
+void pwm_deinit(void);
+pwm_status_t pwm_set_pulse_us(pwm_channel_t channel, uint16_t pulse_us);
+pwm_status_t pwm_set_angle(pwm_channel_t channel, uint8_t angle);
+pwm_status_t pwm_set_pulse_all(const uint16_t *pulse_us);
+bool pwm_is_enabled(void);
+```
+- Frequency: 50 Hz (20 ms period)
+- Pulse width: 1000-2000 µs (1-2 ms) for 0-180°
+- Channels: PA8-PA11 (TIM1), PB6-PB7 (TIM4)
+
 ### Driver Layer
 
 #### LSM6DSO (`drivers/lsm6dso.h`)
@@ -173,7 +192,7 @@ States:
 ## Runtime Behavior
 On reset the firmware:
 1. Configures system clock to 24 MHz (HSE × 3), SysTick at 1 ms
-2. Initializes GPIO, SPI1, USART2 (115200 8N1), TIM2 (100 Hz), TIM3 (1 kHz)
+2. Initializes GPIO, SPI1, USART2 (115200 8N1), TIM1/TIM4 (PWM 50 Hz), TIM2 (100 Hz), TIM3 (1 kHz)
 3. Programs LSM6DSO: CTRL2_G=0x5C (208 Hz, 2000 dps), CTRL3_C=BDU|IF_INC
 4. Verifies WHO_AM_I (0x6C) with 3 retries and 100ms stabilization
 5. Periodically (100 Hz) prints: `X: data Y: data Z: data `

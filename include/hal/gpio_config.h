@@ -46,6 +46,16 @@
 #define GPIO_CNF_AF_OD        (3U << 2) /**< Alternate function output open-drain */
 
 /*============================================================================
+ * PWM Pin Configuration (Servo motors)
+ *===========================================================================*/
+#define PWM_TIM1_CH1_PIN (8U)  /**< TIM1 CH1 - PA8 */
+#define PWM_TIM1_CH2_PIN (9U)  /**< TIM1 CH2 - PA9 */
+#define PWM_TIM1_CH3_PIN (10U) /**< TIM1 CH3 - PA10 */
+#define PWM_TIM1_CH4_PIN (11U) /**< TIM1 CH4 - PA11 */
+#define PWM_TIM4_CH1_PIN (6U)  /**< TIM4 CH1 - PB6 */
+#define PWM_TIM4_CH2_PIN (7U)  /**< TIM4 CH2 - PB7 */
+
+/*============================================================================
  * GPIO Port Default Configurations
  *===========================================================================*/
 /**
