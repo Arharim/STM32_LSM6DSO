@@ -1,6 +1,6 @@
 # STM32F103 + LSM6DSO Gyroscope (CMSIS, PlatformIO)
 
-Bare-metal STM32F103 (Blue Pill) firmware using CMSIS and direct register access to interface with an ST LSM6DSO IMU over SPI. The firmware initializes clocks, GPIO, SPI1, USART1, and timers, configures the LSM6DSO gyroscope, and periodically reads gyro XYZ data and streams formatted values over UART.
+Bare-metal STM32F103 (Blue Pill) firmware using CMSIS and direct register access to interface with an ST LSM6DSO IMU over SPI. The firmware initializes clocks, GPIO, SPI1, USART2, and timers, configures the LSM6DSO gyroscope, and periodically reads gyro XYZ data and streams formatted values over UART.
 
 - Board: genericSTM32F103C8T6 (Blue Pill)
 - Framework: CMSIS (no HAL/LL)
@@ -15,22 +15,22 @@ Bare-metal STM32F103 (Blue Pill) firmware using CMSIS and direct register access
 - Finite state machine for non-blocking startup, read, process, output
 - TIM2 generates 100 Hz "tick" for sampling; TIM3 used for delays
 - SysTick 1 ms system tick
-- UART1 115200 8N1 output of "X: Y: Z:" lines
+- UART2 115200 8N1 output of "X: Y: Z:" lines
 - Error handling with HSE/PLL fallback to HSI
 
 ## Hardware
 - MCU: STM32F103C8T6 (Blue Pill)
 - IMU: ST LSM6DSO (STEVAL-MKI196V1) (tested with WHO_AM_I = 0x6C)
 
-Recommended wiring (SPI1 and UART1):
+Recommended wiring (SPI1 and UART2):
 - PA4  -> LSM6DSO CS (active low)
 - PA5  -> LSM6DSO SCK
 - PA6  -> LSM6DSO MISO
 - PA7  -> LSM6DSO MOSI
 - 3.3V -> LSM6DSO VDD and VDDIO
 - GND  -> LSM6DSO GND
-- PA9 (USART1 TX)  -> USB-UART RX (host)
-- PA10 (USART1 RX) -> USB-UART TX (host) [optional]
+- PA2 (USART2 TX)  -> USB-UART RX (host)
+- PA3 (USART2 RX) -> USB-UART TX (host) [optional]
 
 Notes:
 - SPI mode is 3; ensure the IMU board supports 3.3V logic.
@@ -93,7 +93,7 @@ src/
 clock_status_t clock_init(void);  // Initialize system clock, returns CLOCK_OK or error
 ```
 - On HSE/PLL error, falls back to HSI and returns error code
-- Enables clocks for GPIOA, SPI1, USART1, TIM2, TIM3
+- Enables clocks for GPIOA, SPI1, USART2, TIM2, TIM3
 
 #### GPIO (`hal/gpio.h`)
 ```c
@@ -173,7 +173,7 @@ States:
 ## Runtime Behavior
 On reset the firmware:
 1. Configures system clock to 24 MHz (HSE × 3), SysTick at 1 ms
-2. Initializes GPIO, SPI1, USART1 (115200 8N1), TIM2 (100 Hz), TIM3 (1 kHz)
+2. Initializes GPIO, SPI1, USART2 (115200 8N1), TIM2 (100 Hz), TIM3 (1 kHz)
 3. Programs LSM6DSO: CTRL2_G=0x5C (208 Hz, 2000 dps), CTRL3_C=BDU|IF_INC
 4. Verifies WHO_AM_I (0x6C) with 3 retries and 100ms stabilization
 5. Periodically (100 Hz) prints: `X: data Y: data Z: data `
@@ -194,7 +194,7 @@ Pin definitions in `include/hal/gpio_config.h`:
 - `SPI_CS_PIN`, `UART_TX_PIN`, etc.
 
 ## Troubleshooting
-- No output: Check 115200 baud, correct serial port, USART1 TX (PA9) connected
+- No output: Check 115200 baud, correct serial port, USART2 TX (PA2) connected
 - Wrong/constant values: Confirm SPI mode 3 wiring and CS line (PA4)
 - Upload errors: Configure `upload_protocol = stlink` in platformio.ini
 - HSE timeout: Check external crystal, firmware will fall back to HSI

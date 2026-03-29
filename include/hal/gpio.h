@@ -15,13 +15,13 @@
  * @brief Initialize GPIO peripherals
  *
  * Configures:
- * - PA0-3, PA8, PA11-15: Input with pull-down
+ * - PA0-1, PA8, PA11-15: Input with pull-down
+ * - PA2 (UART_TX): Alternate function push-pull
+ * - PA3 (UART_RX): Input floating
  * - PA4 (SPI_CS): Output push-pull, initially high
  * - PA5 (SPI_SCK): Alternate function push-pull
  * - PA6 (SPI_MISO): Input floating
  * - PA7 (SPI_MOSI): Alternate function push-pull
- * - PA9 (UART_TX): Alternate function push-pull
- * - PA10 (UART_RX): Input floating
  * - GPIOB, GPIOC: All pins input with pull-down
  */
 void gpio_init(void);

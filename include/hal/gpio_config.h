@@ -23,8 +23,8 @@
 /*============================================================================
  * UART Pin Configuration
  *===========================================================================*/
-#define UART_TX_PIN (9U)  /**< UART Transmit pin (PA9) */
-#define UART_RX_PIN (10U) /**< UART Receive pin (PA10) */
+#define UART_TX_PIN (2U) /**< UART Transmit pin (PA2) */
+#define UART_RX_PIN (3U) /**< UART Receive pin (PA3) */
 
 /*============================================================================
  * GPIO Mode Constants (CRL/CRH register values)

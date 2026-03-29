@@ -3,7 +3,7 @@
  * @brief UART driver module
  * @author STM32_LSM6DSO Project
  *
- * This module provides UART communication using USART1 with
+ * This module provides UART communication using USART2 with
  * interrupt-driven TX circular buffer.
  */
 
@@ -31,9 +31,9 @@ typedef enum {
 } uart_status_t;
 
 /**
- * @brief Initialize USART1 peripheral
+ * @brief Initialize USART2 peripheral
  *
- * Configures USART1 as:
+ * Configures USART2 as:
  * - 115200 baud
  * - 8 data bits
  * - No parity
@@ -43,9 +43,9 @@ typedef enum {
 void uart_init(void);
 
 /**
- * @brief Deinitialize USART1 peripheral
+ * @brief Deinitialize USART2 peripheral
  *
- * Disables USART1, clears TX buffer, disables interrupts.
+ * Disables USART2, clears TX buffer, disables interrupts.
  */
 void uart_deinit(void);
 

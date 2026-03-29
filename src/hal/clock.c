@@ -60,8 +60,8 @@ clock_status_t clock_init(void) {
 	SystemCoreClockUpdate();
 	SysTick_Config(SystemCoreClock / 1000U);
 
-	RCC->APB2ENR |=
-	    (RCC_APB2ENR_IOPAEN | RCC_APB2ENR_SPI1EN | RCC_APB2ENR_USART1EN);
+	RCC->APB2ENR |= (RCC_APB2ENR_IOPAEN | RCC_APB2ENR_SPI1EN);
+	RCC->APB1ENR |= RCC_APB1ENR_USART2EN;
 	RCC->APB1ENR |= (RCC_APB1ENR_TIM2EN | RCC_APB1ENR_TIM3EN);
 
 	g_clock_initialized = true;
