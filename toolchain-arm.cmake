@@ -1,0 +1,41 @@
+set(CMAKE_SYSTEM_NAME Generic)
+set(CMAKE_SYSTEM_PROCESSOR ARM)
+
+set(TOOLCHAIN_PREFIX arm-none-eabi)
+
+if(DEFINED ENV{ARM_GCC_PATH})
+    set(TOOLCHAIN_DIR $ENV{ARM_GCC_PATH})
+else()
+    find_program(TOOLCHAIN_FIND ${TOOLCHAIN_PREFIX}-gcc)
+    if(TOOLCHAIN_FIND)
+        get_filename_component(TOOLCHAIN_DIR ${TOOLCHAIN_FIND} DIRECTORY)
+        file(TO_CMAKE_PATH "${TOOLCHAIN_DIR}" TOOLCHAIN_DIR)
+    else()
+        message(FATAL_ERROR
+            "${TOOLCHAIN_PREFIX}-gcc not found in PATH.\n"
+            "Set ARM_GCC_PATH environment variable to the bin/ directory of your toolchain.\n"
+            "Example: export ARM_GCC_PATH=C:/Users/makar/scoop/apps/gcc-arm-none-eabi/current/bin"
+        )
+    endif()
+endif()
+
+file(TO_CMAKE_PATH "${TOOLCHAIN_DIR}" TOOLCHAIN_DIR)
+
+if(WIN32)
+    set(TOOLCHAIN_EXT .exe)
+else()
+    set(TOOLCHAIN_EXT "")
+endif()
+
+set(CMAKE_C_COMPILER   ${TOOLCHAIN_DIR}/${TOOLCHAIN_PREFIX}-gcc${TOOLCHAIN_EXT})
+set(CMAKE_ASM_COMPILER ${TOOLCHAIN_DIR}/${TOOLCHAIN_PREFIX}-gcc${TOOLCHAIN_EXT})
+set(CMAKE_CXX_COMPILER ${TOOLCHAIN_DIR}/${TOOLCHAIN_PREFIX}-g++${TOOLCHAIN_EXT})
+
+set(CMAKE_OBJCOPY ${TOOLCHAIN_DIR}/${TOOLCHAIN_PREFIX}-objcopy${TOOLCHAIN_EXT} CACHE INTERNAL "")
+set(CMAKE_SIZE    ${TOOLCHAIN_DIR}/${TOOLCHAIN_PREFIX}-size${TOOLCHAIN_EXT}    CACHE INTERNAL "")
+
+set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+
+set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
