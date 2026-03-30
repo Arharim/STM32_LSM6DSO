@@ -1,10 +1,10 @@
-# STM32F103 + LSM6DSO Gyroscope (CMSIS, PlatformIO)
+# STM32F103 + LSM6DSO Gyroscope (CMSIS, CMake/Ninja)
 
 Bare-metal STM32F103 (Blue Pill) firmware using CMSIS and direct register access to interface with an ST LSM6DSO IMU over SPI. The firmware initializes clocks, GPIO, SPI1, USART2, and timers, configures the LSM6DSO gyroscope, and periodically reads gyro XYZ data and streams formatted values over UART.
 
 - Board: genericSTM32F103C8T6 (Blue Pill)
 - Framework: CMSIS (no HAL/LL)
-- Build system: PlatformIO
+- Build system: CMake + Ninja + just
 - License: Apache 2.0
 
 ## Features
@@ -42,52 +42,65 @@ Notes:
 
 ## Build and Flash
 Requirements:
-- VS Code with PlatformIO extension, or PlatformIO CLI
-- ST-Link/V2 (recommended) or another supported uploader
+- arm-none-eabi-gcc (ARM embedded toolchain)
+- CMake 3.20+
+- Ninja 1.11+
+- just (command runner)
+- OpenOCD (for flashing)
 
-PlatformIO environment:
-- Defined in platformio.ini as `[env:genericSTM32F103C8]`
-- Framework: cmsis
-- Build flags: -DSTM32F103xB
+Quick commands (run from project root):
+- `just build` — configure and compile
+- `just flash` — build and flash via ST-Link
+- `just flash-jlink` — build and flash via J-Link
+- `just clean` — remove build artifacts
+- `just rebuild` — clean and build
+- `just deploy` — clean, build, and flash via ST-Link
 
-Using PlatformIO (CLI):
-- Build: `pio run`
-- Upload: `pio run -t upload`
-- Monitor: `pio device monitor -b 115200`
-
-Using VS Code (PIO extension):
-- Project Tasks → Build / Upload / Monitor
+Run `just --list` to see all available recipes.
 
 ## Project Structure
 ```
-include/
-├── config.h              # System configuration constants
-├── hal/
-│   ├── clock.h           # RCC, PLL configuration
-│   ├── gpio.h            # GPIO initialization
-│   ├── gpio_config.h     # GPIO pin definitions
-│   ├── pwm.h             # PWM driver for servos
-│   ├── spi.h             # SPI driver
-│   ├── timer.h           # SysTick, TIM2, TIM3
-│   └── uart.h            # UART with TX buffer
-├── drivers/
-│   └── lsm6dso.h         # LSM6DSO IMU driver
-└── app/
-    └── fsm.h             # Finite state machine
-
-src/
-├── main.c                # Entry point
-├── hal/
-│   ├── clock.c           # Clock implementation
-│   ├── gpio.c            # GPIO implementation
-│   ├── pwm.c             # PWM implementation
-│   ├── spi.c             # SPI implementation
-│   ├── timer.c           # Timer implementation
-│   └── uart.c            # UART implementation
-├── drivers/
-│   └── lsm6dso.c         # LSM6DSO implementation
-└── app/
-    └── fsm.c             # FSM implementation
+├── CMakeLists.txt          # Build configuration
+├── toolchain-arm.cmake     # ARM GCC cross-compilation toolchain
+├── justfile                # Short build/flash/clean commands
+├── startup_stm32f103xb.s   # Vector table and startup code
+├── STM32F103XB_FLASH.ld    # Linker script (64K Flash, 20K RAM)
+├── cmsis/                  # CMSIS Core headers
+│   ├── core_cm3.h
+│   ├── cmsis_compiler.h
+│   ├── cmsis_gcc.h
+│   ├── cmsis_version.h
+│   └── mpu_armv7.h
+├── include/
+│   ├── config.h            # System configuration constants
+│   ├── stm32f10x.h         # Device peripheral definitions
+│   ├── system_stm32f10x.h  # System init header
+│   ├── hal/
+│   │   ├── clock.h         # RCC, PLL configuration
+│   │   ├── gpio.h          # GPIO initialization
+│   │   ├── gpio_config.h   # GPIO pin definitions
+│   │   ├── pwm.h           # PWM driver for servos
+│   │   ├── spi.h           # SPI driver
+│   │   ├── timer.h         # SysTick, TIM2, TIM3
+│   │   └── uart.h          # UART with TX buffer
+│   ├── drivers/
+│   │   └── lsm6dso.h       # LSM6DSO IMU driver
+│   └── app/
+│       └── fsm.h           # Finite state machine
+└── src/
+    ├── main.c              # Entry point
+    ├── system_stm32f10x.c  # SystemInit implementation
+    ├── hal/
+    │   ├── clock.c
+    │   ├── gpio.c
+    │   ├── pwm.c
+    │   ├── spi.c
+    │   ├── timer.c
+    │   └── uart.c
+    ├── drivers/
+    │   └── lsm6dso.c       # LSM6DSO implementation
+    └── app/
+        └── fsm.c           # FSM implementation
 ```
 
 ## API Reference
@@ -215,8 +228,9 @@ Pin definitions in `include/hal/gpio_config.h`:
 ## Troubleshooting
 - No output: Check 115200 baud, correct serial port, USART2 TX (PA2) connected
 - Wrong/constant values: Confirm SPI mode 3 wiring and CS line (PA4)
-- Upload errors: Configure `upload_protocol = stlink` in platformio.ini
+- Upload errors: Verify ST-Link/J-Link connection and OpenOCD installation
 - HSE timeout: Check external crystal, firmware will fall back to HSI
+- Compiler not found: Ensure arm-none-eabi-gcc is in PATH
 
 ## License
 This project is licensed under the Apache License 2.0. See LICENSE for details.
