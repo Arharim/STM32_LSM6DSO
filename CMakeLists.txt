@@ -4,8 +4,18 @@ project(STM32_LSM6DSO C ASM)
 
 set(MCU_FLAGS -mcpu=cortex-m3 -mthumb)
 
-add_compile_options(${MCU_FLAGS} -Wall -Wextra -g3 -O0)
-add_compile_definitions(STM32F103xB)
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build type" FORCE)
+endif()
+string(TOUPPER ${CMAKE_BUILD_TYPE} BUILD_TYPE_UPPER)
+
+if(BUILD_TYPE_UPPER STREQUAL "RELEASE")
+    add_compile_options(${MCU_FLAGS} -Wall -Wextra -Os -flto)
+    add_compile_definitions(STM32F103xB NDEBUG)
+else()
+    add_compile_options(${MCU_FLAGS} -Wall -Wextra -g3 -O0)
+    add_compile_definitions(STM32F103xB)
+endif()
 
 add_link_options(${MCU_FLAGS}
     -T${CMAKE_SOURCE_DIR}/STM32F103XB_FLASH.ld
